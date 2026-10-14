@@ -1,0 +1,7 @@
+# Command: node scripts/lint.ts
+# Timestamp: 2026-10-14T13:14:46.789Z
+# Exit Code: 0
+# Duration: 75 ms
+
+{"status":"passed","check":"lint","checkedFiles":28,"circularDependencies":0,"hardcodedComponentColors":0,"secretsFound":0}
+

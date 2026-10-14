@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="swiss-minimal">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Swiss Minimal — Self-Hosted Reading Platform</title>
+  <script id="theme-bootstrap">
+(function() {
+  try {
+    var pref = localStorage.getItem('rp_theme') || 'swiss-minimal';
+    var resolved = pref;
+    if (pref === 'system') {
+      resolved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'midnight-amoled'
+        : 'editorial-light';
+    }
+    document.documentElement.setAttribute('data-theme', resolved);
+  } catch (e) {
+    document.documentElement.setAttribute('data-theme', 'editorial-light');
+  }
+})();
+</script>
+  <style>
+[data-theme="editorial-light"] {
+  --color-bg-primary: #FAF8F5;
+  --color-bg-elevated: #FFFFFF;
+  --color-bg-subtle: #F0ECE3;
+  --color-text-primary: #181615;
+  --color-text-secondary: #453F3C;
+  --color-text-muted: #5C5551;
+  --color-accent: #8B261D;
+  --color-accent-text: #FFFFFF;
+  --color-border: #D8D2C7;
+  --color-focus-ring: #8B261D;
+  --color-danger: #9E1C1C;
+  --color-success: #1D5E3A;
+  --color-warning: #7D4E00;
+  --color-highlight-bg: #F7E396;
+  --color-highlight-text: #181615;
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-reading: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --font-mono: "SF Mono", Menlo, Monaco, Consolas, monospace;
+  --scale-base: 17px;
+  --line-height-body: 1.72;
+  --line-height-heading: 1.22;
+  --space-unit: 8px;
+  --radius-sm: 3px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --border-style: solid;
+  --border-width: 1px;
+  --shadow-sm: 0 1px 2px rgba(24, 22, 21, 0.06);
+  --shadow-md: 0 4px 12px rgba(24, 22, 21, 0.08);
+  --focus-ring: 2px solid #8B261D;
+  --motion-duration: 180ms;
+  --motion-easing: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-theme="midnight-amoled"] {
+  --color-bg-primary: #000000;
+  --color-bg-elevated: #0E0E12;
+  --color-bg-subtle: #17171D;
+  --color-text-primary: #F2F2F5;
+  --color-text-secondary: #C2C2CC;
+  --color-text-muted: #9A9AA6;
+  --color-accent: #7AA2F7;
+  --color-accent-text: #000000;
+  --color-border: #2A2A34;
+  --color-focus-ring: #8AB4F8;
+  --color-danger: #F7768E;
+  --color-success: #73DACA;
+  --color-warning: #E0AF68;
+  --color-highlight-bg: #3B3212;
+  --color-highlight-text: #F2F2F5;
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-reading: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "SF Mono", Menlo, Consolas, monospace;
+  --scale-base: 16px;
+  --line-height-body: 1.65;
+  --line-height-heading: 1.25;
+  --space-unit: 7px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --border-style: solid;
+  --border-width: 1px;
+  --shadow-sm: none;
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.85);
+  --focus-ring: 2px solid #8AB4F8;
+  --motion-duration: 140ms;
+  --motion-easing: ease-out;
+}
+
+[data-theme="swiss-minimal"] {
+  --color-bg-primary: #F4F4F4;
+  --color-bg-elevated: #FFFFFF;
+  --color-bg-subtle: #E6E6E6;
+  --color-text-primary: #0A0A0A;
+  --color-text-secondary: #2E2E2E;
+  --color-text-muted: #4F4F4F;
+  --color-accent: #D11A1A;
+  --color-accent-text: #FFFFFF;
+  --color-border: #111111;
+  --color-focus-ring: #0A0A0A;
+  --color-danger: #B80000;
+  --color-success: #005A2B;
+  --color-warning: #6B4700;
+  --color-highlight-bg: #FFE66D;
+  --color-highlight-text: #0A0A0A;
+  --font-ui: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-reading: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: Menlo, Monaco, "Courier New", monospace;
+  --scale-base: 15px;
+  --line-height-body: 1.5;
+  --line-height-heading: 1.15;
+  --space-unit: 6px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --border-style: solid;
+  --border-width: 2px;
+  --shadow-sm: none;
+  --shadow-md: 4px 4px 0px #111111;
+  --focus-ring: 3px solid #0A0A0A;
+  --motion-duration: 80ms;
+  --motion-easing: linear;
+}
+
+[data-theme="soft-sepia"] {
+  --color-bg-primary: #F3EAD8;
+  --color-bg-elevated: #FAF3E6;
+  --color-bg-subtle: #E8DCC4;
+  --color-text-primary: #2A1F14;
+  --color-text-secondary: #4A3928;
+  --color-text-muted: #5E4B36;
+  --color-accent: #7A3E12;
+  --color-accent-text: #FFFFFF;
+  --color-border: #CEBE9E;
+  --color-focus-ring: #7A3E12;
+  --color-danger: #8C2318;
+  --color-success: #26532B;
+  --color-warning: #6E470B;
+  --color-highlight-bg: #EACF8B;
+  --color-highlight-text: #2A1F14;
+  --font-ui: Georgia, "Times New Roman", serif;
+  --font-reading: Georgia, "Book Antiqua", Palatino, serif;
+  --font-mono: "Courier New", Courier, monospace;
+  --scale-base: 17px;
+  --line-height-body: 1.78;
+  --line-height-heading: 1.26;
+  --space-unit: 9px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+  --border-style: solid;
+  --border-width: 1px;
+  --shadow-sm: 0 1px 3px rgba(42, 31, 20, 0.08);
+  --shadow-md: 0 4px 14px rgba(42, 31, 20, 0.12);
+  --focus-ring: 2px dashed #7A3E12;
+  --motion-duration: 200ms;
+  --motion-easing: ease-in-out;
+}
+
+/* COMPONENT_RULES */
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--scale-base);
+  line-height: var(--line-height-body);
+  transition: background-color var(--motion-duration) var(--motion-easing),
+              color var(--motion-duration) var(--motion-easing);
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.app-shell {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+}
+@media (max-width: 768px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+}
+.sidebar {
+  background-color: var(--color-bg-elevated);
+  border-right: var(--border-width) var(--border-style) var(--color-border);
+  padding: calc(var(--space-unit) * 2);
+}
+.main-region {
+  padding: calc(var(--space-unit) * 3);
+  max-width: 1080px;
+}
+.capture-bar {
+  display: flex;
+  gap: var(--space-unit);
+  background-color: var(--color-bg-elevated);
+  border: var(--border-width) var(--border-style) var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-unit);
+  box-shadow: var(--shadow-sm);
+}
+.btn-primary {
+  background-color: var(--color-accent);
+  color: var(--color-accent-text);
+  border: var(--border-width) var(--border-style) var(--color-accent);
+  border-radius: var(--radius-sm);
+  padding: calc(var(--space-unit) * 0.75) calc(var(--space-unit) * 1.5);
+  cursor: pointer;
+}
+.item-row {
+  background-color: var(--color-bg-elevated);
+  border: var(--border-width) var(--border-style) var(--color-border);
+  border-radius: var(--radius-md);
+  padding: calc(var(--space-unit) * 1.5);
+  margin-bottom: var(--space-unit);
+}
+.reader-article {
+  font-family: var(--font-reading);
+  line-height: var(--line-height-body);
+  max-width: 68ch;
+  margin: 0 auto;
+}
+.reader-article mark {
+  background-color: var(--color-highlight-bg);
+  color: var(--color-highlight-text);
+}
+.command-palette-dialog {
+  background-color: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  border: var(--border-width) var(--border-style) var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: calc(var(--space-unit) * 2);
+}
+.error-banner {
+  background-color: var(--color-bg-subtle);
+  color: var(--color-danger);
+  border: var(--border-width) var(--border-style) var(--color-danger);
+  border-radius: var(--radius-md);
+  padding: calc(var(--space-unit) * 1.5);
+}
+</style>
+</head>
+<body>
+  <div class="app-shell">
+    <nav class="sidebar" aria-label="Primary Navigation">
+      <a href="/?view=inbox">Inbox</a>
+      <a href="/?view=all">All Items</a>
+      <a href="/?view=unread">Unread</a>
+      <a href="/?view=favorites">Favorites</a>
+      <a href="/?view=archived">Archived</a>
+      <a href="/?view=failed">Failed</a>
+      <a href="/?screen=settings">Settings</a>
+    </nav>
+    <main class="main-region" id="main-content">
+      
+      <article class="reader-article" aria-labelledby="reader-title" style="max-width:68ch;font-size:18px;line-height:1.7">
+        <header>
+          <h1 id="reader-title">Reader View</h1>
+          <p class="reader-byline">Unknown Author · example.com</p>
+        </header>
+        <nav aria-label="Table of Contents"><ul></ul></nav>
+        <div class="reader-body"><p>Article content ready.</p></div>
+      </article>
+    </main>
+  </div>
+</body>
+</html>

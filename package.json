@@ -1,0 +1,29 @@
+{
+  "name": "self-hosted-reading-platform",
+  "version": "2.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "scripts": {
+    "verify": "node scripts/verify.ts",
+    "lint": "node scripts/lint.ts",
+    "format:check": "node scripts/format-check.ts",
+    "typecheck": "node scripts/typecheck.ts",
+    "test:unit": "node --test tests/unit/*.test.ts",
+    "test:integration": "node --test tests/integration/*.test.ts",
+    "test:e2e": "node --test tests/e2e/*.test.ts",
+    "test:security": "node --test tests/security/*.test.ts",
+    "build": "node scripts/build.ts",
+    "smoke": "node scripts/smoke.ts",
+    "benchmark": "node benchmark/run.ts",
+    "backup": "node scripts/backup.ts",
+    "restore": "node scripts/restore.ts",
+    "migrate": "node scripts/migrate.ts",
+    "dev": "node apps/web/src/server.ts",
+    "start": "NODE_ENV=production node apps/web/src/server.ts",
+    "worker": "node apps/worker/src/worker.ts"
+  }
+}

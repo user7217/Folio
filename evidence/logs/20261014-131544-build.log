@@ -1,0 +1,7 @@
+# Command: node scripts/build.ts
+# Timestamp: 2026-10-14T13:15:51.593Z
+# Exit Code: 0
+# Duration: 85 ms
+
+{"status":"passed","check":"build","screenshotsGenerated":24,"manifest":"dist/build-manifest.json"}
+

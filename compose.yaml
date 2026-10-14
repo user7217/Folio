@@ -1,0 +1,38 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOST: 0.0.0.0
+      DATA_DIR: /app/data
+      REGISTRATION_MODE: invite_only
+    volumes:
+      - app_data:/app/data
+    stop_grace_period: 15s
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/readyz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["node", "apps/worker/src/worker.ts"]
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /app/data
+      WORKER_POLL_INTERVAL_MS: "500"
+      WORKER_STALE_TIMEOUT_MS: "30000"
+    volumes:
+      - app_data:/app/data
+    stop_grace_period: 15s
+
+volumes:
+  app_data:

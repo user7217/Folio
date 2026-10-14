@@ -1,0 +1,19 @@
+# Command: node --test tests/integration/platform.test.ts
+# Timestamp: 2026-10-14T13:15:50.905Z
+# Exit Code: 0
+# Duration: 5874 ms
+
+✔ Clean install and migration upgrade from schema v1 with existing data (2.425708ms)
+✔ Generated Authorization Matrix (Section 9.2): unauthenticated, another user, viewer vs editor, revoked member, and revoked session (262.191334ms)
+✔ Capture -> Job -> Extraction -> Search -> Reprocess -> Delete consistency & concurrent duplicates (67.428708ms)
+✔ Worker crash / kill mid-job recovery and retry/backoff/dead-letter behavior (348.7685ms)
+✔ Feeds conditional GET (ETag / 304), offline sync replay with conflicts, and Backup/Restore round-trip (5083.890084ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5847.678042
+

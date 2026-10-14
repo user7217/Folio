@@ -1,0 +1,7 @@
+# Command: node scripts/format-check.ts
+# Timestamp: 2026-10-14T13:14:46.846Z
+# Exit Code: 0
+# Duration: 53 ms
+
+{"status":"passed","check":"format:check","checkedFiles":33}
+
