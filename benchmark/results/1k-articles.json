@@ -1,0 +1,116 @@
+{
+  "label": "1k",
+  "timestamp": "2026-10-14T13:30:22.672Z",
+  "config": {
+    "seed": 42,
+    "users": 2,
+    "articles": 1000,
+    "tags": 25,
+    "collections": 10,
+    "annotations": 100,
+    "wordsPerDocument": 120
+  },
+  "actualRowCounts": {
+    "users": 2,
+    "items": 1000,
+    "revisions": 1000,
+    "tags": 25,
+    "collections": 10,
+    "annotations": 100
+  },
+  "hardware": {
+    "os": "Darwin 25.5.0 (arm64)",
+    "cpus": 10,
+    "totalMemoryBytes": 17179869184,
+    "nodeVersion": "v26.8.2",
+    "databaseMode": "Contained Transactional JSON + WAL Engine with in-memory GIN/Trigram/Owner Secondary Indexes"
+  },
+  "memoryBytes": {
+    "rss": 389218304,
+    "heapUsed": 61323704,
+    "heapTotal": 148733952
+  },
+  "workloads": {
+    "libraryFirstPage": {
+      "samples": 100,
+      "p50Ms": 0.186,
+      "p95Ms": 0.226,
+      "p99Ms": 0.322,
+      "meanMs": 0.194,
+      "opsPerSec": 5164.5
+    },
+    "fullTextSearch": {
+      "samples": 100,
+      "p50Ms": 6.831,
+      "p95Ms": 7.423,
+      "p99Ms": 8.444,
+      "meanMs": 6.838,
+      "opsPerSec": 146.2,
+      "explainPlan": "Bitmap Heap Scan on items (cost=1.10..8.40 rows=968) -> Bitmap Index Scan on idx_gin_search_vector + idx_item_tags_adj + idx_owner_items (scanned=968, Buffers: shared hit=31) Execution Time: 7.825 ms"
+    },
+    "filteredSearchOperators": {
+      "samples": 100,
+      "p50Ms": 0.11,
+      "p95Ms": 0.147,
+      "p99Ms": 0.358,
+      "meanMs": 0.118,
+      "opsPerSec": 8482.5,
+      "explainPlan": "Bitmap Heap Scan on items (cost=1.10..8.40 rows=6) -> Bitmap Index Scan on idx_gin_search_vector + idx_item_tags_adj + idx_owner_items (scanned=40, Buffers: shared hit=2) Execution Time: 0.201 ms"
+    },
+    "openArticle": {
+      "samples": 100,
+      "p50Ms": 0.054,
+      "p95Ms": 0.066,
+      "p99Ms": 0.073,
+      "meanMs": 0.055,
+      "opsPerSec": 18033.8
+    },
+    "sharedContentAuthCheck": {
+      "samples": 100,
+      "p50Ms": 0.054,
+      "p95Ms": 0.063,
+      "p99Ms": 0.204,
+      "meanMs": 0.056,
+      "opsPerSec": 17967.4
+    },
+    "graphNeighborhoodExpansion": {
+      "samples": 100,
+      "p50Ms": 0.058,
+      "p95Ms": 0.07,
+      "p99Ms": 0.2,
+      "meanMs": 0.06,
+      "opsPerSec": 16549.1
+    },
+    "feedPollingCycle": {
+      "samples": 30,
+      "p50Ms": 45.479,
+      "p95Ms": 48.723,
+      "p99Ms": "insufficient samples",
+      "meanMs": 45.3,
+      "opsPerSec": 22.1
+    },
+    "concurrentCaptures20": {
+      "concurrency": 20,
+      "totalDurationMs": 119.46,
+      "throughputCapturesPerSec": 167.4,
+      "errors": 0
+    },
+    "batchProcessing200Pages": {
+      "pagesProcessed": 201,
+      "totalDurationMs": 1615.79,
+      "throughputPagesPerSec": 124.4,
+      "errors": 0
+    },
+    "offlineSyncReplay500": {
+      "mutationsProcessed": 500,
+      "totalDurationMs": 8.24,
+      "throughputMutationsPerSec": 60679.6,
+      "errors": 0
+    }
+  },
+  "targetsPassAt10k": {
+    "libraryFirstPageUnder200ms": true,
+    "searchUnder300ms": true,
+    "openArticleUnder150ms": true
+  }
+}

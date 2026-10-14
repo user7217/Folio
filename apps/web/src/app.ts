@@ -968,9 +968,11 @@ self.addEventListener('fetch', (e) => {
 
       return this.db.read((st) => {
         const rows: Array<{ item: Item; state: ReturnType<ContainedDatabase['getOrCreateUserItemState']>; tags: string[] }> = [];
+        const accessibleIds = this.db.getAccessibleItemIdsForUser(userId);
 
-        for (const item of Object.values(st.items)) {
-          if (!this.db.canUserReadItem(userId, item)) continue;
+        for (const itemId of accessibleIds) {
+          const item = st.items[itemId];
+          if (!item) continue;
           const uState = this.db.getOrCreateUserItemState(userId, item.id);
 
           if (view === 'trashed') {
@@ -990,13 +992,7 @@ self.addEventListener('fetch', (e) => {
           if (statusFilter && item.processing_status !== statusFilter) continue;
           if (favFilter === 'true' && !uState.is_favorite) continue;
 
-          const itemTags: string[] = [];
-          for (const it of Object.values(st.item_tags)) {
-            if (it.item_id === item.id) {
-              const t = st.tags[it.tag_id];
-              if (t) itemTags.push(t.name);
-            }
-          }
+          const itemTags = this.db.getItemTagNames(item.id);
           if (tagFilter && !itemTags.some((t) => t.toLowerCase() === tagFilter)) continue;
 
           if (colFilter) {
@@ -1076,10 +1072,7 @@ self.addEventListener('fetch', (e) => {
         const item = st.items[params.id]!;
         const state = this.db.getOrCreateUserItemState(userId, item.id);
         const revision = item.current_revision_id ? st.item_revisions[item.current_revision_id] || null : null;
-        const tags = Object.values(st.item_tags)
-          .filter((it) => it.item_id === item.id)
-          .map((it) => st.tags[it.tag_id])
-          .filter(Boolean);
+        const tags = this.db.getItemTagNames(item.id);
         return json(200, { item, state, revision, tags });
       });
     }

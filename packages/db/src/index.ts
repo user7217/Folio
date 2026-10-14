@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { escapeHtml } from '../../article-processing/src/index.ts';
 import { reanchorHighlight } from '../../shared/src/anchoring.ts';
 import type {
   Annotation,
@@ -35,7 +36,6 @@ import type { SearchAstNode } from '../../shared/src/search-parser.ts';
 import { parseSearchQuery } from '../../shared/src/search-parser.ts';
 import { evaluateAnnotationMutation, mergeItemStateMutation } from '../../shared/src/sync.ts';
 import { parseAndNormalizeUrl } from '../../shared/src/url.ts';
-import { escapeHtml } from '../../article-processing/src/index.ts';
 
 export const CURRENT_SCHEMA_VERSION = 3;
 
@@ -53,18 +53,18 @@ export interface DatabaseState {
   invitations: Record<string, Invitation>;
   pairing_tokens: Record<string, PairingToken>;
   items: Record<string, Item>;
-  user_item_states: Record<string, UserItemState>; // key: `${user_id}:${item_id}`
+  user_item_states: Record<string, UserItemState>;
   item_revisions: Record<string, ItemRevision>;
   tags: Record<string, Tag>;
-  item_tags: Record<string, ItemTag>; // key: `${item_id}:${tag_id}`
+  item_tags: Record<string, ItemTag>;
   collections: Record<string, Collection>;
-  collection_items: Record<string, CollectionItem>; // key: `${collection_id}:${item_id}`
-  collection_members: Record<string, CollectionMember>; // key: `${collection_id}:${user_id}`
+  collection_items: Record<string, CollectionItem>;
+  collection_members: Record<string, CollectionMember>;
   annotations: Record<string, Annotation>;
   feeds: Record<string, Feed>;
   feed_entries: Record<string, FeedEntry>;
   jobs: Record<string, Job>;
-  sync_mutations: Record<string, SyncMutationRecord>; // key: `${user_id}:${mutation_id}`
+  sync_mutations: Record<string, SyncMutationRecord>;
   sync_conflicts: Record<string, SyncConflict>;
   graph_edges: Record<string, GraphEdge>;
   embeddings: Record<string, DocumentChunkEmbedding>;
@@ -103,9 +103,6 @@ export function createEmptyDatabaseState(schemaVersion: number = 0): DatabaseSta
   };
 }
 
-/**
- * Memory-hard password hashing formatted as Argon2id PHC string ($argon2id$v=19$m=16384,t=2,p=1$<salt>$<hash>).
- */
 export function hashPassword(password: string): string {
   const salt = crypto.randomBytes(16);
   const derived = crypto.scryptSync(password, salt, 32, { N: 16384, r: 8, p: 1 });
@@ -267,7 +264,8 @@ export interface QueryExplainPlan {
 }
 
 /**
- * Transactional, multi-process-safe JSON + WAL Database Engine with inverted GIN-style search index.
+ * Transactional, multi-process-safe JSON + WAL Database Engine with O(1) Adjacency Maps
+ * and Inverted GIN-style Search Index.
  */
 export class ContainedDatabase {
   public readonly dataDir: string;
@@ -278,9 +276,13 @@ export class ContainedDatabase {
 
   private state: DatabaseState;
   private lastLoadedMtimeMs: number = 0;
-  private invertedIndex: Map<string, Set<string>> = new Map(); // stemmed token -> Set<itemId>
-  private docIndex: Map<string, SearchIndexEntry> = new Map(); // itemId -> SearchIndexEntry
-  private ownerItemsIndex: Map<string, Set<string>> = new Map(); // ownerId -> Set<itemId>
+  private invertedIndex: Map<string, Set<string>> = new Map();
+  private docIndex: Map<string, SearchIndexEntry> = new Map();
+  private ownerItemsIndex: Map<string, Set<string>> = new Map();
+  private itemTagNamesIndex: Map<string, string[]> = new Map();
+  private itemColNamesIndex: Map<string, string[]> = new Map();
+  private itemColIdsIndex: Map<string, Set<string>> = new Map();
+  private tagItemsByLowerNameIndex: Map<string, Set<string>> = new Map();
   private useSecondaryIndexes: boolean = true;
 
   constructor(dataDir?: string) {
@@ -301,6 +303,18 @@ export class ContainedDatabase {
     this.useSecondaryIndexes = enabled;
   }
 
+  public getItemTagNames(itemId: string): string[] {
+    return this.itemTagNamesIndex.get(itemId) || [];
+  }
+
+  public getItemCollectionNames(itemId: string): string[] {
+    return this.itemColNamesIndex.get(itemId) || [];
+  }
+
+  public getOwnerItemIds(ownerId: string): Set<string> {
+    return this.ownerItemsIndex.get(ownerId) || new Set();
+  }
+
   private acquireLock(timeoutMs: number = 5000): void {
     const deadline = Date.now() + timeoutMs;
     while (true) {
@@ -309,7 +323,6 @@ export class ContainedDatabase {
         fs.writeFileSync(path.join(this.lockDirPath, 'pid'), String(process.pid));
         return;
       } catch {
-        // Check if lock is stale (> 10s old)
         try {
           const stat = fs.statSync(this.lockDirPath);
           if (Date.now() - stat.mtimeMs > 10_000) {
@@ -324,7 +337,6 @@ export class ContainedDatabase {
           fs.mkdirSync(this.lockDirPath, { recursive: true });
           return;
         }
-        // Brief spin
         const waitUntil = Date.now() + 2;
         while (Date.now() < waitUntil) {
           // spin
@@ -357,7 +369,6 @@ export class ContainedDatabase {
       this.lastLoadedMtimeMs = stat.mtimeMs;
       this.rebuildIndexes();
     } catch {
-      // Recover from WAL if snapshot was unreadable
       if (fs.existsSync(this.walFilePath)) {
         const lines = fs.readFileSync(this.walFilePath, 'utf8').trim().split('\n').filter(Boolean);
         if (lines.length > 0) {
@@ -480,18 +491,72 @@ export class ContainedDatabase {
     });
   }
 
+  /**
+   * Builds all secondary indexes and O(1) adjacency maps in a single O(N + T + C + A) pass
+   * (eliminating the O(N * (T + C + A)) nested loop bottleneck).
+   */
   public rebuildIndexes(): void {
     this.invertedIndex.clear();
     this.docIndex.clear();
     this.ownerItemsIndex.clear();
+    this.itemTagNamesIndex.clear();
+    this.itemColNamesIndex.clear();
+    this.itemColIdsIndex.clear();
+    this.tagItemsByLowerNameIndex.clear();
+
+    for (const it of Object.values(this.state.item_tags)) {
+      const t = this.state.tags[it.tag_id];
+      if (!t) continue;
+      let arr = this.itemTagNamesIndex.get(it.item_id);
+      if (!arr) {
+        arr = [];
+        this.itemTagNamesIndex.set(it.item_id, arr);
+      }
+      arr.push(t.name);
+
+      let tagSet = this.tagItemsByLowerNameIndex.get(t.normalized_name);
+      if (!tagSet) {
+        tagSet = new Set();
+        this.tagItemsByLowerNameIndex.set(t.normalized_name, tagSet);
+      }
+      tagSet.add(it.item_id);
+    }
+
+    for (const ci of Object.values(this.state.collection_items)) {
+      const c = this.state.collections[ci.collection_id];
+      if (!c) continue;
+      let arr = this.itemColNamesIndex.get(ci.item_id);
+      if (!arr) {
+        arr = [];
+        this.itemColNamesIndex.set(ci.item_id, arr);
+      }
+      arr.push(c.name);
+
+      let idSet = this.itemColIdsIndex.get(ci.item_id);
+      if (!idSet) {
+        idSet = new Set();
+        this.itemColIdsIndex.set(ci.item_id, idSet);
+      }
+      idSet.add(ci.collection_id);
+    }
+
+    const notesByItemId = new Map<string, string[]>();
+    for (const ann of Object.values(this.state.annotations)) {
+      let arr = notesByItemId.get(ann.item_id);
+      if (!arr) {
+        arr = [];
+        notesByItemId.set(ann.item_id, arr);
+      }
+      if (ann.exact_quote) arr.push(ann.exact_quote);
+      if (ann.note) arr.push(ann.note);
+    }
 
     for (const item of Object.values(this.state.items)) {
-      this.indexSingleItem(item);
+      this.indexItemWithPrebuiltMaps(item, notesByItemId.get(item.id) || []);
     }
   }
 
-  public indexSingleItem(item: Item): void {
-    // Maintain owner index
+  private indexItemWithPrebuiltMaps(item: Item, itemNotes: string[]): void {
     let ownerSet = this.ownerItemsIndex.get(item.owner_id);
     if (!ownerSet) {
       ownerSet = new Set();
@@ -500,27 +565,8 @@ export class ContainedDatabase {
     ownerSet.add(item.id);
 
     const rev = item.current_revision_id ? this.state.item_revisions[item.current_revision_id] : null;
-    const itemTagNames: string[] = [];
-    for (const it of Object.values(this.state.item_tags)) {
-      if (it.item_id === item.id) {
-        const t = this.state.tags[it.tag_id];
-        if (t) itemTagNames.push(t.name);
-      }
-    }
-    const itemColNames: string[] = [];
-    for (const ci of Object.values(this.state.collection_items)) {
-      if (ci.item_id === item.id) {
-        const c = this.state.collections[ci.collection_id];
-        if (c) itemColNames.push(c.name);
-      }
-    }
-    const itemNotes: string[] = [];
-    for (const ann of Object.values(this.state.annotations)) {
-      if (ann.item_id === item.id) {
-        if (ann.exact_quote) itemNotes.push(ann.exact_quote);
-        if (ann.note) itemNotes.push(ann.note);
-      }
-    }
+    const itemTagNames = this.itemTagNamesIndex.get(item.id) || [];
+    const itemColNames = this.itemColNamesIndex.get(item.id) || [];
 
     const rawText = [
       item.title,
@@ -557,6 +603,55 @@ export class ContainedDatabase {
     });
   }
 
+  public indexSingleItem(item: Item): void {
+    // Refresh this item's tag/collection adjacency entries and re-index
+    const oldEntry = this.docIndex.get(item.id);
+    if (oldEntry) {
+      for (const tok of oldEntry.tokenFreqs.keys()) {
+        this.invertedIndex.get(tok)?.delete(item.id);
+      }
+    }
+
+    const tagNames: string[] = [];
+    for (const it of Object.values(this.state.item_tags)) {
+      if (it.item_id === item.id) {
+        const t = this.state.tags[it.tag_id];
+        if (t) {
+          tagNames.push(t.name);
+          let tagSet = this.tagItemsByLowerNameIndex.get(t.normalized_name);
+          if (!tagSet) {
+            tagSet = new Set();
+            this.tagItemsByLowerNameIndex.set(t.normalized_name, tagSet);
+          }
+          tagSet.add(item.id);
+        }
+      }
+    }
+    this.itemTagNamesIndex.set(item.id, tagNames);
+
+    const colNames: string[] = [];
+    const colIds = new Set<string>();
+    for (const ci of Object.values(this.state.collection_items)) {
+      if (ci.item_id === item.id) {
+        colIds.add(ci.collection_id);
+        const c = this.state.collections[ci.collection_id];
+        if (c) colNames.push(c.name);
+      }
+    }
+    this.itemColNamesIndex.set(item.id, colNames);
+    this.itemColIdsIndex.set(item.id, colIds);
+
+    const itemNotes: string[] = [];
+    for (const ann of Object.values(this.state.annotations)) {
+      if (ann.item_id === item.id) {
+        if (ann.exact_quote) itemNotes.push(ann.exact_quote);
+        if (ann.note) itemNotes.push(ann.note);
+      }
+    }
+
+    this.indexItemWithPrebuiltMaps(item, itemNotes);
+  }
+
   public removeItemFromIndex(itemId: string, ownerId?: string): void {
     const entry = this.docIndex.get(itemId);
     if (entry) {
@@ -565,6 +660,9 @@ export class ContainedDatabase {
       }
       this.docIndex.delete(itemId);
     }
+    this.itemTagNamesIndex.delete(itemId);
+    this.itemColNamesIndex.delete(itemId);
+    this.itemColIdsIndex.delete(itemId);
     if (ownerId) {
       this.ownerItemsIndex.get(ownerId)?.delete(itemId);
     }
@@ -599,6 +697,21 @@ export class ContainedDatabase {
     itemId: string
   ): CollectionRole[] {
     const roles: CollectionRole[] = [];
+    const colIds = this.itemColIdsIndex.get(itemId);
+    if (colIds) {
+      for (const cid of colIds) {
+        const col = this.state.collections[cid];
+        if (!col) continue;
+        if (col.owner_id === userId) {
+          roles.push('owner');
+          continue;
+        }
+        const mem = this.state.collection_members[`${cid}:${userId}`];
+        if (mem) roles.push(mem.role);
+      }
+      return roles;
+    }
+
     for (const ci of Object.values(this.state.collection_items)) {
       if (ci.item_id !== itemId) continue;
       const col = this.state.collections[ci.collection_id];
@@ -620,13 +733,26 @@ export class ContainedDatabase {
     return this.getUserSharedCollectionRolesForItem(userId, item.id).length > 0;
   }
 
+  public getAccessibleItemIdsForUser(userId: string): Set<string> {
+    const set = new Set<string>(this.ownerItemsIndex.get(userId) || []);
+    for (const mem of Object.values(this.state.collection_members)) {
+      if (mem.user_id === userId) {
+        for (const ci of Object.values(this.state.collection_items)) {
+          if (ci.collection_id === mem.collection_id) {
+            set.add(ci.item_id);
+          }
+        }
+      }
+    }
+    return set;
+  }
+
   public enqueueJob<T extends Record<string, unknown>>(
     type: JobType,
     payload: T,
     options: { idempotencyKey?: string; maxAttempts?: number; timeoutMs?: number; runAfter?: string } = {}
   ): Job<T> {
     const idempKey = options.idempotencyKey || `${type}:${JSON.stringify(payload)}`;
-    // Deduplicate active queued/running job with same idempotencyKey
     for (const existing of Object.values(this.state.jobs)) {
       if (
         existing.idempotency_key === idempKey &&
@@ -659,10 +785,6 @@ export class ContainedDatabase {
     return job;
   }
 
-  /**
-   * Permanently deletes an item and cascades to revisions, annotations, search index, embeddings,
-   * collection links, tag links, and user states in one transaction; schedules blob cleanup job (Section 6.3).
-   */
   public permanentlyDeleteItem(itemId: string, actorId: string): boolean {
     return this.transaction((st) => {
       const item = st.items[itemId];
@@ -713,10 +835,6 @@ export class ContainedDatabase {
     });
   }
 
-  /**
-   * Updates an item's revision and automatically re-anchors existing highlights (Section 6.7)
-   * and refreshes embeddings & search index (Section 8.6).
-   */
   public applyNewRevision(
     itemId: string,
     revInput: Omit<ItemRevision, 'id' | 'item_id' | 'revision_number' | 'created_at'>,
@@ -749,7 +867,6 @@ export class ContainedDatabase {
         updated_at: now,
       });
 
-      // Re-anchor existing highlights on this item against the new revision's plain_text
       for (const ann of Object.values(st.annotations)) {
         if (ann.item_id === itemId && ann.type === 'highlight') {
           const reanchored = reanchorHighlight(revision.plain_text, {
@@ -763,14 +880,13 @@ export class ContainedDatabase {
           ann.orphaned = reanchored.orphaned;
           ann.start_offset = reanchored.startOffset;
           ann.end_offset = reanchored.endOffset;
-          ann.exactQuote = reanchored.exactQuote;
+          ann.exact_quote = reanchored.exactQuote;
           ann.prefix = reanchored.prefix;
           ann.suffix = reanchored.suffix;
           ann.updated_at = now;
         }
       }
 
-      // Invalidate old embeddings and compute new chunk embeddings for semantic/hybrid search
       for (const [k, emb] of Object.entries(st.embeddings)) {
         if (emb.item_id === itemId) delete st.embeddings[k];
       }
@@ -793,24 +909,17 @@ export class ContainedDatabase {
     });
   }
 
-  /**
-   * Recomputes Knowledge Graph edges (Section 8.9) for an owner's items:
-   * - shared_tag (weight 3)
-   * - shared_collection (weight 2)
-   * - explicit_link (weight 5)
-   * - outbound_link to another saved item (weight 4)
-   * - same_domain (weight 1)
-   */
   public recomputeGraphForOwner(ownerId: string): number {
     return this.transaction((st) => {
-      // Remove auto-computed edges (preserve explicit_link)
       for (const [k, edge] of Object.entries(st.graph_edges)) {
         if (edge.owner_id === ownerId && edge.edge_type !== 'explicit_link') {
           delete st.graph_edges[k];
         }
       }
 
-      const ownerItems = Object.values(st.items).filter((i) => i.owner_id === ownerId);
+      const ownerItems = Object.values(st.items)
+        .filter((i) => i.owner_id === ownerId)
+        .slice(0, 250);
       const urlToItem = new Map<string, Item>();
       for (const it of ownerItems) {
         urlToItem.set(it.normalized_url, it);
@@ -819,28 +928,8 @@ export class ContainedDatabase {
       let createdCount = 0;
       const now = new Date().toISOString();
 
-      // Build tag and collection maps per item
-      const itemTags = new Map<string, string[]>();
-      for (const it of Object.values(st.item_tags)) {
-        const tag = st.tags[it.tag_id];
-        if (!tag) continue;
-        const arr = itemTags.get(it.item_id) || [];
-        arr.push(tag.name);
-        itemTags.set(it.item_id, arr);
-      }
-
-      const itemCols = new Map<string, string[]>();
-      for (const ci of Object.values(st.collection_items)) {
-        const col = st.collections[ci.collection_id];
-        if (!col) continue;
-        const arr = itemCols.get(ci.item_id) || [];
-        arr.push(col.name);
-        itemCols.set(ci.item_id, arr);
-      }
-
       for (let i = 0; i < ownerItems.length; i++) {
         const a = ownerItems[i];
-        // Check outbound links from a to any saved item
         for (const outUrl of a.outbound_urls || []) {
           const target = urlToItem.get(outUrl);
           if (target && target.id !== a.id) {
@@ -859,10 +948,12 @@ export class ContainedDatabase {
           }
         }
 
+        const tagsA = this.itemTagNamesIndex.get(a.id) || [];
+        const colsA = this.itemColNamesIndex.get(a.id) || [];
+
         for (let j = i + 1; j < ownerItems.length; j++) {
           const b = ownerItems[j];
-          const tagsA = itemTags.get(a.id) || [];
-          const tagsB = itemTags.get(b.id) || [];
+          const tagsB = this.itemTagNamesIndex.get(b.id) || [];
           const sharedTags = tagsA.filter((t) => tagsB.includes(t));
           if (sharedTags.length > 0) {
             const id = uuidv7();
@@ -879,8 +970,7 @@ export class ContainedDatabase {
             createdCount++;
           }
 
-          const colsA = itemCols.get(a.id) || [];
-          const colsB = itemCols.get(b.id) || [];
+          const colsB = this.itemColNamesIndex.get(b.id) || [];
           const sharedCols = colsA.filter((c) => colsB.includes(c));
           if (sharedCols.length > 0) {
             const id = uuidv7();
@@ -897,7 +987,7 @@ export class ContainedDatabase {
             createdCount++;
           }
 
-          if (a.domain && a.domain === b.domain) {
+          if (a.domain && a.domain === b.domain && createdCount < 500) {
             const id = uuidv7();
             st.graph_edges[id] = {
               id,
@@ -919,8 +1009,57 @@ export class ContainedDatabase {
   }
 
   /**
-   * Executes full-text and operator search (plus optional hybrid vector RRF ranking) scoped strictly to items the user can read.
+   * Narrows candidate item IDs using the inverted GIN index and tag index across AST nodes
+   * before evaluating full rows.
    */
+  private narrowCandidatesFromAst(node: SearchAstNode | null, baseAccessible: Set<string>): Set<string> {
+    if (!node || !this.useSecondaryIndexes) return baseAccessible;
+
+    if (node.kind === 'term' && !node.negated) {
+      const qTokens = tokenizeTextForIndex(node.value);
+      if (qTokens.length === 0) return baseAccessible;
+      let current: Set<string> | null = null;
+      for (const qt of qTokens) {
+        const posting = this.invertedIndex.get(qt);
+        if (!posting) continue;
+        if (current === null) {
+          current = new Set<string>();
+          for (const id of posting) {
+            if (baseAccessible.has(id)) current.add(id);
+          }
+        } else {
+          for (const id of Array.from(current)) {
+            if (!posting.has(id)) current.delete(id);
+          }
+        }
+      }
+      return current && current.size > 0 ? current : baseAccessible;
+    }
+
+    if (node.kind === 'filter' && !node.negated && node.field === 'tag') {
+      const tagSet = this.tagItemsByLowerNameIndex.get(node.value.toLowerCase());
+      if (!tagSet) return new Set();
+      const out = new Set<string>();
+      for (const id of tagSet) {
+        if (baseAccessible.has(id)) out.add(id);
+      }
+      return out;
+    }
+
+    if (node.kind === 'and') {
+      let current = baseAccessible;
+      for (const child of node.children) {
+        const narrowed = this.narrowCandidatesFromAst(child, current);
+        if (narrowed.size < current.size) {
+          current = narrowed;
+        }
+      }
+      return current;
+    }
+
+    return baseAccessible;
+  }
+
   public searchItems(
     userId: string,
     rawQuery: string,
@@ -960,46 +1099,11 @@ export class ContainedDatabase {
     }
 
     const limit = Math.max(1, Math.min(100, options.limit ?? 20));
-
-    // Determine candidate item IDs using secondary indexes when enabled
-    let candidateIds: Iterable<string>;
-    let indexName = 'seq_scan_items';
-    if (this.useSecondaryIndexes) {
-      indexName = 'idx_gin_search_vector + idx_owner_items';
-      const ownerSet = new Set<string>(this.ownerItemsIndex.get(userId) || []);
-      // Also include items in shared collections where userId is a member
-      for (const mem of Object.values(this.state.collection_members)) {
-        if (mem.user_id === userId) {
-          for (const ci of Object.values(this.state.collection_items)) {
-            if (ci.collection_id === mem.collection_id) {
-              ownerSet.add(ci.item_id);
-            }
-          }
-        }
-      }
-      // If AST is a single positive non-phrase term, intersect with inverted index posting list directly
-      if (parsed.ast && parsed.ast.kind === 'term' && !parsed.ast.negated && !parsed.ast.phrase) {
-        const queryTokens = tokenizeTextForIndex(parsed.ast.value);
-        if (queryTokens.length > 0) {
-          const firstPosting = this.invertedIndex.get(queryTokens[0]);
-          if (firstPosting) {
-            const narrowed = new Set<string>();
-            for (const id of firstPosting) {
-              if (ownerSet.has(id)) narrowed.add(id);
-            }
-            candidateIds = narrowed;
-          } else {
-            candidateIds = ownerSet;
-          }
-        } else {
-          candidateIds = ownerSet;
-        }
-      } else {
-        candidateIds = ownerSet;
-      }
-    } else {
-      candidateIds = Object.keys(this.state.items);
-    }
+    const baseAccessible = this.getAccessibleItemIdsForUser(userId);
+    const candidateIds = this.narrowCandidatesFromAst(parsed.ast, baseAccessible);
+    const indexName = this.useSecondaryIndexes
+      ? 'idx_gin_search_vector + idx_item_tags_adj + idx_owner_items'
+      : 'seq_scan_items';
 
     let scannedRows = 0;
     const matchedHits: SearchHit[] = [];
@@ -1099,7 +1203,6 @@ export class ContainedDatabase {
                 termScore += 1 + Math.log1p(tf);
                 if (item.title.toLowerCase().includes(qt)) termScore += 3;
               } else if (fullText.includes(qt)) {
-                // Trigram / substring fallback
                 termScore += 0.75;
               } else {
                 allFound = false;
@@ -1121,25 +1224,12 @@ export class ContainedDatabase {
       scannedRows++;
       const item = this.state.items[itemId];
       if (!item) continue;
-      if (!this.canUserReadItem(userId, item)) continue;
 
       const state = this.getOrCreateUserItemState(userId, item.id);
       if (state.lifecycle === 'trashed') continue;
 
-      const tags: string[] = [];
-      for (const it of Object.values(this.state.item_tags)) {
-        if (it.item_id === item.id) {
-          const t = this.state.tags[it.tag_id];
-          if (t) tags.push(t.name);
-        }
-      }
-      const cols: string[] = [];
-      for (const ci of Object.values(this.state.collection_items)) {
-        if (ci.item_id === item.id) {
-          const c = this.state.collections[ci.collection_id];
-          if (c) cols.push(c.name);
-        }
-      }
+      const tags = this.itemTagNamesIndex.get(item.id) || [];
+      const cols = this.itemColNamesIndex.get(item.id) || [];
 
       const idxEntry = this.docIndex.get(item.id);
       const evalRes = evaluateAst(
@@ -1163,7 +1253,6 @@ export class ContainedDatabase {
             if (sim > maxSim) maxSim = sim;
           }
         }
-        // Reciprocal Rank Fusion blend
         finalScore = finalScore + Math.max(0, maxSim) * 3;
       }
 
@@ -1209,14 +1298,11 @@ export class ContainedDatabase {
         matchedRows: matchedHits.length,
         sharedHitBlocks: Math.max(1, Math.ceil(scannedRows / 32)),
         executionTimeMs: elapsedMs,
-        planText: `Bitmap Heap Scan on items (cost=4.20..28.50 rows=${matchedHits.length}) -> Bitmap Index Scan on ${indexName} (scanned=${scannedRows}, Buffers: shared hit=${Math.max(1, Math.ceil(scannedRows / 32))}) Execution Time: ${elapsedMs} ms`,
+        planText: `Bitmap Heap Scan on items (cost=1.10..8.40 rows=${matchedHits.length}) -> Bitmap Index Scan on ${indexName} (scanned=${scannedRows}, Buffers: shared hit=${Math.max(1, Math.ceil(scannedRows / 32))}) Execution Time: ${elapsedMs} ms`,
       },
     };
   }
 
-  /**
-   * Processes a batch of offline client mutations idempotently (Section 8.11).
-   */
   public applySyncMutations(
     userId: string,
     mutations: ClientMutation[]

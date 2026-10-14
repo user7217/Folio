@@ -295,7 +295,9 @@ export class WorkerEngine {
         }
       );
 
-      this.db.recomputeGraphForOwner(item.owner_id);
+      this.db.transaction(() =>
+        this.db.enqueueJob('graph.recompute', { ownerId: item.owner_id }, { idempotencyKey: `graph:${item.owner_id}` })
+      );
       return;
     }
 
