@@ -1,0 +1,7 @@
+# Command: node scripts/typecheck.ts
+# Timestamp: 2026-10-14T13:38:34.315Z
+# Exit Code: 0
+# Duration: 98 ms
+
+{"status":"passed","check":"typecheck","checkedModules":15}
+

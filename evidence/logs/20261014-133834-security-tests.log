@@ -1,0 +1,18 @@
+# Command: node --test tests/security/adversarial.test.ts
+# Timestamp: 2026-10-14T13:38:40.983Z
+# Exit Code: 0
+# Duration: 312 ms
+
+✔ Security: DNS rebinding defense via resolve-and-pin and multi-record validation (4.1645ms)
+✔ Security: Decompression bombs, Slowloris timeouts, unexpected MIME types, and CRLF header injection (42.923166ms)
+✔ Security: Hostile feeds, malformed PDF/EPUB, zip-bombs, and blob path traversal (62.62975ms)
+✔ Security: Cross-user isolation across Search, Graph, Export, Recommendations, CSRF, Rate-Limit, and Concurrent Destructive Requests (96.322583ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 287.146916
+
