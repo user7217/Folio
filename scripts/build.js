@@ -1,9 +1,8 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { ThemeId } from '../packages/shared/src/index.ts';
-import { THEMES, verifyThemeContrast } from '../packages/shared/src/themes.ts';
-import { renderAppScreenHtml, renderThemeScreenshotPng } from '../packages/ui/src/index.ts';
+import { THEMES, verifyThemeContrast } from '../packages/shared/src/themes.js';
+import { renderAppScreenHtml, renderThemeScreenshotPng } from '../packages/ui/src/index.js';
 
 const rootDir = process.env.PROJECT_ROOT || '/Users/harsha1/Documents/pocket_clone';
 const distDir = path.join(rootDir, 'dist');
@@ -16,12 +15,12 @@ const screens = [
   'command-palette',
   'error-state',
   'pdf-reader',
-] as const;
+];
 
-const screenshotsGenerated: string[] = [];
+const screenshotsGenerated = [];
 const contrastAudits = [];
 
-for (const themeId of Object.keys(THEMES) as ThemeId[]) {
+for (const themeId of Object.keys(THEMES)) {
   const audit = verifyThemeContrast(THEMES[themeId]);
   if (!audit.passesWcagAA) {
     throw new Error(`Theme ${themeId} failed WCAG 2.2 AA contrast check: ${JSON.stringify(audit.ratios)}`);
@@ -46,8 +45,8 @@ const buildManifest = {
   builtAt: new Date().toISOString(),
   nodeVersion: process.version,
   entrypoints: {
-    web: 'apps/web/src/server.ts',
-    worker: 'apps/worker/src/worker.ts',
+    web: 'apps/web/src/server.js',
+    worker: 'apps/worker/src/worker.js',
     extension: 'apps/extension/manifest.json',
   },
   contrastAudits,

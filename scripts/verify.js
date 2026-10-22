@@ -6,37 +6,27 @@ const rootDir = process.env.PROJECT_ROOT || '/Users/harsha1/Documents/pocket_clo
 const logsDir = path.join(rootDir, 'evidence', 'logs');
 fs.mkdirSync(logsDir, { recursive: true });
 
-function formatTimestamp(d: Date = new Date()): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
+function formatTimestamp(d = new Date()) {
+  const pad = (n) => String(n).padStart(2, '0');
   return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}-${pad(d.getUTCHours())}${pad(
     d.getUTCMinutes()
   )}${pad(d.getUTCSeconds())}`;
 }
 
-interface StepSpec {
-  name: string;
-  args: string[];
-}
-
-const steps: StepSpec[] = [
-  { name: 'lint', args: ['scripts/lint.ts'] },
-  { name: 'format-check', args: ['scripts/format-check.ts'] },
-  { name: 'typecheck', args: ['scripts/typecheck.ts'] },
-  { name: 'unit-tests', args: ['--test', 'tests/unit/core.test.ts'] },
-  { name: 'integration-tests', args: ['--test', 'tests/integration/platform.test.ts'] },
-  { name: 'e2e-tests', args: ['--test', 'tests/e2e/workflows.test.ts'] },
-  { name: 'security-tests', args: ['--test', 'tests/security/adversarial.test.ts'] },
-  { name: 'build', args: ['scripts/build.ts'] },
-  { name: 'smoke', args: ['scripts/smoke.ts'] },
+const steps = [
+  { name: 'lint', args: ['scripts/lint.js'] },
+  { name: 'format-check', args: ['scripts/format-check.js'] },
+  { name: 'typecheck', args: ['scripts/typecheck.js'] },
+  { name: 'unit-tests', args: ['--test', 'tests/unit/core.test.js'] },
+  { name: 'integration-tests', args: ['--test', 'tests/integration/platform.test.js'] },
+  { name: 'e2e-tests', args: ['--test', 'tests/e2e/workflows.test.js'] },
+  { name: 'security-tests', args: ['--test', 'tests/security/adversarial.test.js'] },
+  { name: 'build', args: ['scripts/build.js'] },
+  { name: 'smoke', args: ['scripts/smoke.js'] },
 ];
 
-const results: Array<{
-  step: string;
-  status: 'passed' | 'failed';
-  exitCode: number;
-  durationMs: number;
-  logFile: string;
-}> = [];
+const results
+= [];
 
 const tsPrefix = formatTimestamp();
 let overallSuccess = true;

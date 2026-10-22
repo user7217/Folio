@@ -3,17 +3,17 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { ReadingPlatformApp } from '../../apps/web/src/app.ts';
-import { WorkerEngine } from '../../apps/worker/src/worker.ts';
-import { createZipArchive } from '../../packages/article-processing/src/index.ts';
-import { ContainedDatabase, createEmptyDatabaseState } from '../../packages/db/src/index.ts';
-import { ROUTE_REGISTRY, uuidv7 } from '../../packages/shared/src/index.ts';
-import { createBackup } from '../../scripts/backup.ts';
-import { restoreBackup } from '../../scripts/restore.ts';
+import { ReadingPlatformApp } from '../../apps/web/src/app.js';
+import { WorkerEngine } from '../../apps/worker/src/worker.js';
+import { createZipArchive } from '../../packages/article-processing/src/index.js';
+import { ContainedDatabase, createEmptyDatabaseState } from '../../packages/db/src/index.js';
+import { ROUTE_REGISTRY, uuidv7 } from '../../packages/shared/src/index.js';
+import { createBackup } from '../../scripts/backup.js';
+import { restoreBackup } from '../../scripts/restore.js';
 
 const rootDir = process.env.PROJECT_ROOT || '/Users/harsha1/Documents/pocket_clone';
 
-function createTempDataDir(prefix: string): string {
+function createTempDataDir(prefix) {
   const dir = path.join(rootDir, '.cache', `int-${prefix}-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`);
   fs.mkdirSync(dir, { recursive: true });
   return dir;
@@ -85,29 +85,29 @@ test('Generated Authorization Matrix (Section 9.2): unauthenticated, another use
       path: '/api/auth/login',
       body: { email: 'owner@example.com', password: 'Password123!' },
     });
-    const ownerToken = (ownerLogin.body as { sessionToken: string }).sessionToken;
+    const ownerToken = (ownerLogin.body).sessionToken;
 
     // Create 3 invitations for otherUser, viewerUser, revokedMemberUser
-    const createUserWithSession = async (username: string, email: string) => {
+    const createUserWithSession = async (username, email) => {
       const invRes = await app.handleRequest({
         method: 'POST',
         path: '/api/admin/invitations',
         headers: { 'x-session-token': ownerToken },
         body: { email },
       });
-      const inviteCode = (invRes.body as { inviteCode: string }).inviteCode;
+      const inviteCode = (invRes.body).inviteCode;
       const regRes = await app.handleRequest({
         method: 'POST',
         path: '/api/auth/register',
         body: { username, email, password: 'Password123!', inviteCode },
       });
-      const userId = (regRes.body as { id: string }).id;
+      const userId = (regRes.body).id;
       const loginRes = await app.handleRequest({
         method: 'POST',
         path: '/api/auth/login',
         body: { email, password: 'Password123!' },
       });
-      return { userId, token: (loginRes.body as { sessionToken: string }).sessionToken };
+      return { userId, token: (loginRes.body).sessionToken };
     };
 
     const other = await createUserWithSession('other', 'other@example.com');
@@ -129,7 +129,7 @@ test('Generated Authorization Matrix (Section 9.2): unauthenticated, another use
       headers: { 'x-session-token': ownerToken },
       body: { url: 'https://example.com/private-item', title: 'Secret Title' },
     });
-    const itemId = (capRes.body as { item: { id: string } }).item.id;
+    const itemId = (capRes.body).item.id;
 
     const colRes = await app.handleRequest({
       method: 'POST',
@@ -137,7 +137,7 @@ test('Generated Authorization Matrix (Section 9.2): unauthenticated, another use
       headers: { 'x-session-token': ownerToken },
       body: { name: 'Shared Team Collection' },
     });
-    const colId = (colRes.body as { collection: { id: string } }).collection.id;
+    const colId = (colRes.body).collection.id;
 
     // Add viewer and revokedMem to collection, then immediately revoke revokedMem
     await app.handleRequest({
@@ -164,7 +164,7 @@ test('Generated Authorization Matrix (Section 9.2): unauthenticated, another use
       headers: { 'x-session-token': ownerToken },
       body: { type: 'note', note: 'Owner private note' },
     });
-    const annId = (annRes.body as { annotation: { id: string } }).annotation.id;
+    const annId = (annRes.body).annotation.id;
 
     const feedRes = await app.handleRequest({
       method: 'POST',
@@ -172,7 +172,7 @@ test('Generated Authorization Matrix (Section 9.2): unauthenticated, another use
       headers: { 'x-session-token': ownerToken },
       body: { url: 'https://example.com/rss.xml' },
     });
-    const feedId = (feedRes.body as { feed: { id: string } }).feed.id;
+    const feedId = (feedRes.body).feed.id;
 
     const expRes = await app.handleRequest({
       method: 'POST',
@@ -180,11 +180,11 @@ test('Generated Authorization Matrix (Section 9.2): unauthenticated, another use
       headers: { 'x-session-token': ownerToken },
       body: { format: 'json' },
     });
-    const exportId = (expRes.body as { exportId: string }).exportId;
+    const exportId = (expRes.body).exportId;
     const worker = new WorkerEngine(db);
     await worker.drainQueue();
 
-    const materializePath = (templatePath: string): string =>
+    const materializePath = (templatePath) =>
       templatePath
         .replace(':id', templatePath.includes('/collections/') ? colId : templatePath.includes('/annotations/') ? annId : templatePath.includes('/feeds/') ? feedId : templatePath.includes('/export/') ? exportId : itemId)
         .replace(':itemId', itemId)
@@ -307,7 +307,7 @@ test('Capture -> Job -> Extraction -> Search -> Reprocess -> Delete consistency 
       path: '/api/auth/login',
       body: { email: 'admin@example.com', password: 'Password123!' },
     });
-    const token = (login.body as { sessionToken: string }).sessionToken;
+    const token = (login.body).sessionToken;
 
     // Concurrent duplicate capture submissions return the same item
     const [c1, c2, c3] = await Promise.all([
@@ -331,8 +331,8 @@ test('Capture -> Job -> Extraction -> Search -> Reprocess -> Delete consistency 
       }),
     ]);
 
-    const item1Id = (c1.body as { item: { id: string } }).item.id;
-    const item2Id = (c2.body as { item: { id: string } }).item.id;
+    const item1Id = (c1.body).item.id;
+    const item2Id = (c2.body).item.id;
     assert.equal(item1Id, item2Id, 'Duplicate normalized URLs must return the existing item');
 
     // Before worker runs, capture record is already persisted with status=queued
@@ -341,7 +341,7 @@ test('Capture -> Job -> Extraction -> Search -> Reprocess -> Delete consistency 
       path: `/api/items/${item1Id}`,
       headers: { 'x-session-token': token },
     });
-    assert.equal((preJobItem.body as { item: { processing_status: string } }).item.processing_status, 'queued');
+    assert.equal((preJobItem.body).item.processing_status, 'queued');
 
     // Run worker
     await worker.drainQueue();
@@ -352,15 +352,15 @@ test('Capture -> Job -> Extraction -> Search -> Reprocess -> Delete consistency 
       path: `/api/items/${item1Id}`,
       headers: { 'x-session-token': token },
     });
-    assert.equal((postJobItem.body as { item: { processing_status: string } }).item.processing_status, 'ready');
+    assert.equal((postJobItem.body).item.processing_status, 'ready');
 
-    const partialItemId = (c3.body as { item: { id: string } }).item.id;
+    const partialItemId = (c3.body).item.id;
     const partialItem = await app.handleRequest({
       method: 'GET',
       path: `/api/items/${partialItemId}`,
       headers: { 'x-session-token': token },
     });
-    assert.equal((partialItem.body as { item: { processing_status: string } }).item.processing_status, 'partial');
+    assert.equal((partialItem.body).item.processing_status, 'partial');
 
     // Create highlight on item1
     const annRes = await app.handleRequest({
@@ -393,14 +393,14 @@ test('Capture -> Job -> Extraction -> Search -> Reprocess -> Delete consistency 
       path: `/api/items/${item1Id}`,
       headers: { 'x-session-token': token },
     });
-    assert.equal((reprocessed.body as { revision: { revision_number: number } }).revision.revision_number, 2);
+    assert.equal((reprocessed.body).revision.revision_number, 2);
 
     const annsAfterReprocess = await app.handleRequest({
       method: 'GET',
       path: `/api/items/${item1Id}/annotations`,
       headers: { 'x-session-token': token },
     });
-    const annList = (annsAfterReprocess.body as { annotations: Array<{ orphaned: boolean }> }).annotations;
+    const annList = (annsAfterReprocess.body).annotations;
     assert.equal(annList[0].orphaned, false);
 
     // Search index consistency after edit and after permanent delete
@@ -409,7 +409,7 @@ test('Capture -> Job -> Extraction -> Search -> Reprocess -> Delete consistency 
       path: '/api/search?q=Transactional+durability',
       headers: { 'x-session-token': token },
     });
-    assert.equal((searchBeforeDel.body as { hits: unknown[] }).hits.length, 1);
+    assert.equal((searchBeforeDel.body).hits.length, 1);
 
     await app.handleRequest({
       method: 'DELETE',
@@ -422,7 +422,7 @@ test('Capture -> Job -> Extraction -> Search -> Reprocess -> Delete consistency 
       path: '/api/search?q=Transactional+durability',
       headers: { 'x-session-token': token },
     });
-    assert.equal((searchAfterDel.body as { hits: unknown[] }).hits.length, 0);
+    assert.equal((searchAfterDel.body).hits.length, 0);
   } finally {
     fs.rmSync(dataDir, { recursive: true, force: true });
   }
@@ -470,7 +470,7 @@ test('Worker crash / kill mid-job recovery and retry/backoff/dead-letter behavio
     });
 
     // Spawn real child process running apps/worker/src/worker.ts with WORKER_SIMULATE_SLOW_MS=5000
-    const child = spawn(process.execPath, [path.join(rootDir, 'apps/worker/src/worker.ts')], {
+    const child = spawn(process.execPath, [path.join(rootDir, 'apps/worker/src/worker.js')], {
       env: {
         ...process.env,
         DATA_DIR: dataDir,
@@ -534,9 +534,9 @@ test('Feeds conditional GET (ETag / 304), offline sync replay with conflicts, an
       path: '/api/auth/login',
       body: { email: 'admin@example.com', password: 'Password123!' },
     });
-    const token = (login.body as { sessionToken: string }).sessionToken;
+    const token = (login.body).sessionToken;
 
-    let etagObserved: string | undefined;
+    let etagObserved;
     const worker = new WorkerEngine(db, {
       resolver: async () => [{ address: '93.184.216.34', family: 4 }],
       transport: async (req) => {
@@ -561,7 +561,7 @@ test('Feeds conditional GET (ETag / 304), offline sync replay with conflicts, an
       headers: { 'x-session-token': token },
       body: { url: 'https://example.com/feed.xml', pollIntervalMinutes: 15 },
     });
-    const feedId = (subRes.body as { feed: { id: string } }).feed.id;
+    const feedId = (subRes.body).feed.id;
     await worker.drainQueue();
 
     // Refresh feed -> sends If-None-Match: "v1-etag", gets 304, does not duplicate entries
@@ -578,7 +578,7 @@ test('Feeds conditional GET (ETag / 304), offline sync replay with conflicts, an
       path: `/api/feeds/${feedId}/entries`,
       headers: { 'x-session-token': token },
     });
-    const entries = (entriesRes.body as { entries: Array<{ id: string }> }).entries;
+    const entries = (entriesRes.body).entries;
     assert.equal(entries.length, 1);
 
     // Save feed entry to library
@@ -588,7 +588,7 @@ test('Feeds conditional GET (ETag / 304), offline sync replay with conflicts, an
       headers: { 'x-session-token': token },
     });
     assert.equal(savedFromFeed.status, 201);
-    const savedItemId = (savedFromFeed.body as { item: { id: string } }).item.id;
+    const savedItemId = (savedFromFeed.body).item.id;
 
     // Upload a PDF document so blobs exist for backup/restore verification
     const pdfBuf = Buffer.from('%PDF-1.4\n1 0 obj << /Type /Page >> endobj\nBT (Backup Verification PDF) Tj ET\n%%EOF', 'latin1');
@@ -663,7 +663,7 @@ test('Feeds conditional GET (ETag / 304), offline sync replay with conflicts, an
       path: '/api/sync/conflicts',
       headers: { 'x-session-token': token },
     });
-    assert.equal((conflictsRes.body as { conflicts: unknown[] }).conflicts.length, 1);
+    assert.equal((conflictsRes.body).conflicts.length, 1);
 
     // Backup and restore round-trip into a fresh database directory
     const backupZipPath = path.join(dataDir, 'backup.zip');

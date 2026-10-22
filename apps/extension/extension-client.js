@@ -1,29 +1,12 @@
-export interface ExtensionStorageState {
-  instanceUrl: string;
-  accessToken: string | null;
-}
 
-export interface ExtensionActionResult {
-  ok: boolean;
-  state: 'saved' | 'paired' | 'unauthenticated' | 'revoked_token' | 'unreachable' | 'invalid_request';
-  message: string;
-  itemId?: string;
-}
-
-export type ExtensionHttpTransport = (
-  url: string,
-  init: { method: string; headers: Record<string, string>; body: string }
-) => Promise<{ status: number; body: Record<string, unknown> }>;
 
 /**
  * Core MV3 Extension client supporting pairing code exchange, current tab capture,
  * selected text capture, and context menu link capture with explicit error states.
  */
 export class ExtensionCaptureClient {
-  private storage: ExtensionStorageState;
-  private transport: ExtensionHttpTransport;
 
-  constructor(initialInstanceUrl: string = 'http://localhost:3000', transport?: ExtensionHttpTransport) {
+  constructor(initialInstanceUrl = 'http://localhost:3000', transport) {
     this.storage = {
       instanceUrl: initialInstanceUrl.replace(/\/$/, ''),
       accessToken: null,
@@ -32,20 +15,20 @@ export class ExtensionCaptureClient {
       transport ||
       (async (url, init) => {
         const res = await fetch(url, init);
-        const data = (await res.json()) as Record<string, unknown>;
+        const data = (await res.json());
         return { status: res.status, body: data };
       });
   }
 
-  public setInstanceUrl(url: string): void {
+  setInstanceUrl(url) {
     this.storage.instanceUrl = url.replace(/\/$/, '');
   }
 
-  public getStorageState(): ExtensionStorageState {
+  getStorageState() {
     return { ...this.storage };
   }
 
-  public async pairWithCode(pairingCode: string): Promise<ExtensionActionResult> {
+  async pairWithCode(pairingCode) {
     try {
       const res = await this.transport(`${this.storage.instanceUrl}/api/extension/pair/exchange`, {
         method: 'POST',
@@ -74,11 +57,8 @@ export class ExtensionCaptureClient {
     }
   }
 
-  public async capture(input: {
-    url: string;
-    title?: string;
-    selection?: string;
-  }): Promise<ExtensionActionResult> {
+  async capture(input
+  ) {
     if (!this.storage.accessToken) {
       return {
         ok: false,
@@ -98,7 +78,7 @@ export class ExtensionCaptureClient {
       });
 
       if (res.status === 200 || res.status === 201) {
-        const item = res.body.item as { id?: string } | undefined;
+        const item = res.body.item;
         return {
           ok: true,
           state: 'saved',

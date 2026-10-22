@@ -15,18 +15,9 @@ const TRACKING_PARAMS = new Set([
   'mkt_tok'
 ]);
 
-export function isTrackingParam(key: string): boolean {
+export function isTrackingParam(key) {
   const lower = key.toLowerCase();
   return lower.startsWith('utm_') || TRACKING_PARAMS.has(lower);
-}
-
-export interface NormalizedUrlResult {
-  originalUrl: string;
-  normalizedUrl: string;
-  hostname: string;
-  domain: string;
-  protocol: 'http:' | 'https:';
-  port: string;
 }
 
 /**
@@ -37,7 +28,7 @@ export interface NormalizedUrlResult {
  * - Strips documented tracking parameters (utm_*, fbclid, gclid, etc.).
  * - Sorts remaining query parameters deterministically.
  */
-export function parseAndNormalizeUrl(rawInput: string): NormalizedUrlResult {
+export function parseAndNormalizeUrl(rawInput) {
   if (!rawInput || typeof rawInput !== 'string') {
     throw new UrlValidationError('URL must be a non-empty string', 'INVALID_URL');
   }
@@ -50,7 +41,7 @@ export function parseAndNormalizeUrl(rawInput: string): NormalizedUrlResult {
     throw new UrlValidationError('URL contains control characters or spaces', 'INVALID_CHARS');
   }
 
-  let parsed: URL;
+  let parsed;
   try {
     parsed = new URL(trimmed);
   } catch {
@@ -72,10 +63,10 @@ export function parseAndNormalizeUrl(rawInput: string): NormalizedUrlResult {
   // Strip fragment
   parsed.hash = '';
 
-  // Normalize hostname (lowercase, strip trailing dot)
-  const cleanHost = parsed.hostname.toLowerCase().replace(/\.$/, '');
-  if (!cleanHost) {
-    throw new UrlValidationError('Empty hostname after normalization', 'EMPTY_HOST');
+  // Normalize hostname (lowercase, strip all trailing dots, reject consecutive/leading dots)
+  const cleanHost = parsed.hostname.toLowerCase().replace(/\.+$/, '');
+  if (!cleanHost || cleanHost.startsWith('.') || cleanHost.includes('..')) {
+    throw new UrlValidationError('Empty or malformed hostname after normalization', 'EMPTY_HOST');
   }
   parsed.hostname = cleanHost;
 
@@ -85,7 +76,7 @@ export function parseAndNormalizeUrl(rawInput: string): NormalizedUrlResult {
   }
 
   // Filter and sort query parameters
-  const keptParams: Array<[string, string]> = [];
+  const keptParams = [];
   for (const [k, v] of parsed.searchParams.entries()) {
     if (!isTrackingParam(k)) {
       keptParams.push([k, v]);
@@ -121,10 +112,10 @@ export function parseAndNormalizeUrl(rawInput: string): NormalizedUrlResult {
 }
 
 export class UrlValidationError extends Error {
-  public readonly code: string;
-  public readonly errorClass: 'permanent' = 'permanent';
+  code;
+  errorClass = 'permanent';
 
-  constructor(message: string, code: string) {
+  constructor(message, code) {
     super(message);
     this.name = 'UrlValidationError';
     this.code = code;
@@ -134,7 +125,7 @@ export class UrlValidationError extends Error {
 /**
  * Redacts query strings and credentials from URLs before logging (Section 9.3).
  */
-export function redactUrlForLog(rawUrl: string): string {
+export function redactUrlForLog(rawUrl) {
   try {
     const u = new URL(rawUrl);
     u.username = '';

@@ -60,3 +60,4 @@ evidence/logs/*.log
 .env.*.local
 .DS_Store
 Thumbs.db
+pocket_clone.code-workspace

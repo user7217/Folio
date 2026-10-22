@@ -5,25 +5,25 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22.6.0"
+    "node": ">=22.0.0"
   },
   "scripts": {
-    "verify": "node scripts/verify.ts",
-    "lint": "node scripts/lint.ts",
-    "format:check": "node scripts/format-check.ts",
-    "typecheck": "node scripts/typecheck.ts",
-    "test:unit": "node --test tests/unit/*.test.ts",
-    "test:integration": "node --test tests/integration/*.test.ts",
-    "test:e2e": "node --test tests/e2e/*.test.ts",
-    "test:security": "node --test tests/security/*.test.ts",
-    "build": "node scripts/build.ts",
-    "smoke": "node scripts/smoke.ts",
-    "benchmark": "node benchmark/run.ts",
-    "backup": "node scripts/backup.ts",
-    "restore": "node scripts/restore.ts",
-    "migrate": "node scripts/migrate.ts",
-    "dev": "node apps/web/src/server.ts",
-    "start": "NODE_ENV=production node apps/web/src/server.ts",
-    "worker": "node apps/worker/src/worker.ts"
+    "verify": "node scripts/verify.js",
+    "lint": "node scripts/lint.js",
+    "format:check": "node scripts/format-check.js",
+    "typecheck": "node scripts/typecheck.js",
+    "test:unit": "node --test tests/unit/*.test.js",
+    "test:integration": "node --test tests/integration/*.test.js",
+    "test:e2e": "node --test tests/e2e/*.test.js",
+    "test:security": "node --test tests/security/*.test.js",
+    "build": "node scripts/build.js",
+    "smoke": "node scripts/smoke.js",
+    "benchmark": "node benchmark/run.js",
+    "backup": "node scripts/backup.js",
+    "restore": "node scripts/restore.js",
+    "migrate": "node scripts/migrate.js",
+    "dev": "node apps/web/src/server.js",
+    "start": "NODE_ENV=production node apps/web/src/server.js",
+    "worker": "node apps/worker/src/worker.js"
   }
 }

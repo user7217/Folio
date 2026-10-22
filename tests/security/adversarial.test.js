@@ -3,15 +3,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import zlib from 'node:zlib';
-import { ReadingPlatformApp } from '../../apps/web/src/app.ts';
-import { WorkerEngine } from '../../apps/worker/src/worker.ts';
-import { createZipArchive, extractZipSafely, parsePdfBuffer } from '../../packages/article-processing/src/index.ts';
-import { ContainedDatabase } from '../../packages/db/src/index.ts';
-import { SsrfError, safeFetch } from '../../packages/shared/src/ssrf.ts';
+import { ReadingPlatformApp } from '../../apps/web/src/app.js';
+import { WorkerEngine } from '../../apps/worker/src/worker.js';
+import { createZipArchive, extractZipSafely, parsePdfBuffer } from '../../packages/article-processing/src/index.js';
+import { ContainedDatabase } from '../../packages/db/src/index.js';
+import { SsrfError, safeFetch } from '../../packages/shared/src/ssrf.js';
 
 const rootDir = process.env.PROJECT_ROOT || '/Users/harsha1/Documents/pocket_clone';
 
-function createSecDataDir(name: string): string {
+function createSecDataDir(name) {
   const d = path.join(rootDir, '.cache', `sec-${name}-${process.pid}-${Date.now()}`);
   fs.mkdirSync(d, { recursive: true });
   return d;
@@ -28,7 +28,7 @@ test('Security: DNS rebinding defense via resolve-and-pin and multi-record valid
         ],
         transport: async () => ({ status: 200, headers: { 'content-type': 'text/html' }, body: Buffer.from('ok') }),
       }),
-    (err: unknown) => err instanceof SsrfError && err.errorClass === 'permanent'
+    (err) => err instanceof SsrfError && err.errorClass === 'permanent'
   );
 
   // 2. DNS rebinding across redirect hops (Hop 1 resolves to public IP, Hop 2 resolves to 169.254.169.254)
@@ -55,13 +55,13 @@ test('Security: DNS rebinding defense via resolve-and-pin and multi-record valid
           };
         },
       }),
-    (err: unknown) => err instanceof SsrfError && err.reason !== 'ok'
+    (err) => err instanceof SsrfError && err.reason !== 'ok'
   );
   assert.equal(transportCalledOnHop2, false, 'Hop 2 must be blocked before connecting');
 });
 
 test('Security: Decompression bombs, Slowloris timeouts, unexpected MIME types, and CRLF header injection', async () => {
-  const pubResolver = async () => [{ address: '93.184.216.34', family: 4 as const }];
+  const pubResolver = async () => [{ address: '93.184.216.34', family: 4 }];
 
   // Gzip decompression bomb (small compressed payload expanding past maxDecompressedBytes)
   const bombPlain = Buffer.alloc(256 * 1024, 'A');
@@ -77,7 +77,7 @@ test('Security: Decompression bombs, Slowloris timeouts, unexpected MIME types, 
           body: compressedBomb,
         }),
       }),
-    (err: unknown) => err instanceof SsrfError && err.code === 'DECOMPRESSION_BOMB'
+    (err) => err instanceof SsrfError && err.code === 'DECOMPRESSION_BOMB'
   );
 
   // Slowloris timeout
@@ -95,7 +95,7 @@ test('Security: Decompression bombs, Slowloris timeouts, unexpected MIME types, 
             });
           }),
       }),
-    (err: unknown) => err instanceof SsrfError && err.code === 'FETCH_TIMEOUT' && err.errorClass === 'transient'
+    (err) => err instanceof SsrfError && err.code === 'FETCH_TIMEOUT' && err.errorClass === 'transient'
   );
 
   // Unexpected MIME type
@@ -109,7 +109,7 @@ test('Security: Decompression bombs, Slowloris timeouts, unexpected MIME types, 
           body: Buffer.from('MZ...'),
         }),
       }),
-    (err: unknown) => err instanceof SsrfError && err.code === 'UNEXPECTED_MIME_TYPE' && err.errorClass === 'permanent'
+    (err) => err instanceof SsrfError && err.code === 'UNEXPECTED_MIME_TYPE' && err.errorClass === 'permanent'
   );
 
   // Malformed response header with CRLF injection
@@ -123,7 +123,7 @@ test('Security: Decompression bombs, Slowloris timeouts, unexpected MIME types, 
           body: Buffer.from('<p>hi</p>'),
         }),
       }),
-    (err: unknown) => err instanceof SsrfError && err.code === 'MALFORMED_HEADERS'
+    (err) => err instanceof SsrfError && err.code === 'MALFORMED_HEADERS'
   );
 });
 
@@ -159,7 +159,7 @@ test('Security: Hostile feeds, malformed PDF/EPUB, zip-bombs, and blob path trav
       path: '/api/auth/login',
       body: { email: 'admin@example.com', password: 'Password123!' },
     });
-    const token = (login.body as { sessionToken: string }).sessionToken;
+    const token = (login.body).sessionToken;
 
     const feedRes = await app.handleRequest({
       method: 'POST',
@@ -167,7 +167,7 @@ test('Security: Hostile feeds, malformed PDF/EPUB, zip-bombs, and blob path trav
       headers: { 'x-session-token': token },
       body: { url: 'https://evil-feed.example.com/rss.xml' },
     });
-    const feedId = (feedRes.body as { feed: { id: string } }).feed.id;
+    const feedId = (feedRes.body).feed.id;
 
     const worker = new WorkerEngine(db, {
       resolver: async () => [{ address: '93.184.216.34', family: 4 }],
@@ -206,8 +206,8 @@ test('Security: Cross-user isolation across Search, Graph, Export, Recommendatio
       path: '/api/auth/login',
       body: { email: 'alice@example.com', password: 'Password123!' },
     });
-    const aliceToken = (aliceLogin.body as { sessionToken: string }).sessionToken;
-    const aliceCsrf = (aliceLogin.body as { csrfToken: string }).csrfToken;
+    const aliceToken = (aliceLogin.body).sessionToken;
+    const aliceCsrf = (aliceLogin.body).csrfToken;
 
     // Create Bob via invite
     const inv = await app.handleRequest({
@@ -223,7 +223,7 @@ test('Security: Cross-user isolation across Search, Graph, Export, Recommendatio
         username: 'bob',
         email: 'bob@example.com',
         password: 'Password123!',
-        inviteCode: (inv.body as { inviteCode: string }).inviteCode,
+        inviteCode: (inv.body).inviteCode,
       },
     });
     const bobLogin = await app.handleRequest({
@@ -231,7 +231,7 @@ test('Security: Cross-user isolation across Search, Graph, Export, Recommendatio
       path: '/api/auth/login',
       body: { email: 'bob@example.com', password: 'Password123!' },
     });
-    const bobToken = (bobLogin.body as { sessionToken: string }).sessionToken;
+    const bobToken = (bobLogin.body).sessionToken;
 
     // Alice saves a confidential item
     const aliceCap = await app.handleRequest({
@@ -240,7 +240,7 @@ test('Security: Cross-user isolation across Search, Graph, Export, Recommendatio
       headers: { 'x-session-token': aliceToken },
       body: { url: 'https://example.com/alice-confidential', title: 'Project Hyperion Secret Blueprint' },
     });
-    const aliceItemId = (aliceCap.body as { item: { id: string } }).item.id;
+    const aliceItemId = (aliceCap.body).item.id;
 
     // Bob searches for "Hyperion" -> 0 hits, no title/snippet/count leak
     const bobSearch = await app.handleRequest({
@@ -248,7 +248,7 @@ test('Security: Cross-user isolation across Search, Graph, Export, Recommendatio
       path: '/api/search?q=Hyperion',
       headers: { 'x-session-token': bobToken },
     });
-    assert.equal((bobSearch.body as { hits: unknown[] }).hits.length, 0);
+    assert.equal((bobSearch.body).hits.length, 0);
     assert.equal(JSON.stringify(bobSearch.body).includes('Hyperion'), false);
 
     // Bob queries Knowledge Graph -> 0 nodes/edges from Alice
@@ -257,7 +257,7 @@ test('Security: Cross-user isolation across Search, Graph, Export, Recommendatio
       path: `/api/graph?itemId=${aliceItemId}`,
       headers: { 'x-session-token': bobToken },
     });
-    assert.equal((bobGraph.body as { nodes: unknown[] }).nodes.length, 0);
+    assert.equal((bobGraph.body).nodes.length, 0);
 
     // CSRF protection: cross-origin state-mutating request with session cookie is rejected with 403
     const csrfBlocked = await app.handleRequest({

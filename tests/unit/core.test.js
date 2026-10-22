@@ -10,22 +10,22 @@ import {
   parseFeedXml,
   parsePdfBuffer,
   sanitizeHtml,
-} from '../../packages/article-processing/src/index.ts';
-import { buildTextAnchor, reanchorHighlight } from '../../packages/shared/src/anchoring.ts';
-import { can } from '../../packages/shared/src/authz.ts';
-import { ROUTE_REGISTRY, uuidv7 } from '../../packages/shared/src/index.ts';
-import { parseSearchQuery } from '../../packages/shared/src/search-parser.ts';
+} from '../../packages/article-processing/src/index.js';
+import { buildTextAnchor, reanchorHighlight } from '../../packages/shared/src/anchoring.js';
+import { can } from '../../packages/shared/src/authz.js';
+import { ROUTE_REGISTRY, uuidv7 } from '../../packages/shared/src/index.js';
+import { parseSearchQuery } from '../../packages/shared/src/search-parser.js';
 import {
   SsrfError,
   checkIpSafety,
   parseIpv4LiteralToUint32,
   safeFetch,
   validateAndPinDestination,
-} from '../../packages/shared/src/ssrf.ts';
-import { evaluateAnnotationMutation, mergeItemStateMutation } from '../../packages/shared/src/sync.ts';
-import { THEMES, verifyThemeContrast } from '../../packages/shared/src/themes.ts';
-import { UrlValidationError, parseAndNormalizeUrl, redactUrlForLog } from '../../packages/shared/src/url.ts';
-import { COMPONENT_ONLY_CSS, renderInlineThemeBootstrapScript } from '../../packages/ui/src/index.ts';
+} from '../../packages/shared/src/ssrf.js';
+import { evaluateAnnotationMutation, mergeItemStateMutation } from '../../packages/shared/src/sync.js';
+import { THEMES, verifyThemeContrast } from '../../packages/shared/src/themes.js';
+import { UrlValidationError, parseAndNormalizeUrl, redactUrlForLog } from '../../packages/shared/src/url.js';
+import { COMPONENT_ONLY_CSS, renderInlineThemeBootstrapScript } from '../../packages/ui/src/index.js';
 
 test('URL normalization strips tracking params, default ports, fragments, and sorts query params', () => {
   const res = parseAndNormalizeUrl(
@@ -126,7 +126,7 @@ test('SSRF destination validator blocks all private, loopback, metadata, IPv6, a
 });
 
 test('SSRF safeFetch validates every redirect hop, blocks loops, and enforces streaming byte & decompression caps', async () => {
-  const pubResolver = async () => [{ address: '93.184.216.34', family: 4 as const }];
+  const pubResolver = async () => [{ address: '93.184.216.34', family: 4 }];
 
   // Redirect to private IP must be rejected before connecting
   await assert.rejects(
@@ -139,7 +139,7 @@ test('SSRF safeFetch validates every redirect hop, blocks loops, and enforces st
           body: Buffer.alloc(0),
         }),
       }),
-    (err: unknown) => err instanceof SsrfError && err.errorClass === 'permanent'
+    (err) => err instanceof SsrfError && err.errorClass === 'permanent'
   );
 
   // Redirect loop detection
@@ -155,7 +155,7 @@ test('SSRF safeFetch validates every redirect hop, blocks loops, and enforces st
           body: Buffer.alloc(0),
         }),
       }),
-    (err: unknown) => err instanceof SsrfError && err.code === 'REDIRECT_LOOP'
+    (err) => err instanceof SsrfError && err.code === 'REDIRECT_LOOP'
   );
 
   // Oversized streaming body rejection
@@ -170,7 +170,7 @@ test('SSRF safeFetch validates every redirect hop, blocks loops, and enforces st
           body: Buffer.alloc(250, 'a'),
         }),
       }),
-    (err: unknown) => err instanceof SsrfError && err.code === 'BODY_TOO_LARGE'
+    (err) => err instanceof SsrfError && err.code === 'BODY_TOO_LARGE'
   );
 });
 
@@ -300,11 +300,11 @@ test('Route registry declares an explicit policy for every route and authorizati
     username: 'alice',
     email: 'alice@example.com',
     password_hash: 'h',
-    role: 'user' as const,
+    role: 'user',
     settings: {
-      theme: 'editorial-light' as const,
-      listLayout: 'comfortable' as const,
-      reader: { width: 'medium' as const, fontSize: 18, fontFamily: 'serif' as const, lineSpacing: 1.7, distractionFree: false },
+      theme: 'editorial-light',
+      listLayout: 'comfortable',
+      reader: { width: 'medium', fontSize: 18, fontFamily: 'serif', lineSpacing: 1.7, distractionFree: false },
       offlineStorageCapMb: 250,
     },
     created_at: new Date().toISOString(),
@@ -328,14 +328,14 @@ test('Route registry declares an explicit policy for every route and authorizati
     featured_image: null,
     language: 'en',
     reading_time_minutes: 1,
-    content_type: 'article' as const,
-    processing_status: 'ready' as const,
+    content_type: 'article',
+    processing_status: 'ready',
     error_message: null,
     error_class: null,
     current_revision_id: null,
     blob_id: null,
     page_count: null,
-    ocr_status: 'none' as const,
+    ocr_status: 'none',
     outbound_urls: [],
     version: 1,
     created_at: new Date().toISOString(),
@@ -396,7 +396,7 @@ test('Offline sync merge rules enforce monotonic progress, LWW state merge, and 
     item_id: 'i1',
     is_read: false,
     is_favorite: false,
-    lifecycle: 'active' as const,
+    lifecycle: 'active',
     trashed_at: null,
     progress_percent: 60,
     progress_page: null,
@@ -426,7 +426,7 @@ test('Offline sync merge rules enforce monotonic progress, LWW state merge, and 
     item_id: 'i1',
     user_id: 'u1',
     revision_id: 'r1',
-    type: 'highlight' as const,
+    type: 'highlight',
     exact_quote: 'quote',
     prefix: '',
     suffix: '',
@@ -456,10 +456,10 @@ test('Offline sync merge rules enforce monotonic progress, LWW state merge, and 
 });
 
 test('Four themes are token-complete, pass WCAG 2.2 AA contrast, and use zero hard-coded component colors', () => {
-  const themeIds = Object.keys(THEMES) as Array<keyof typeof THEMES>;
+  const themeIds = Object.keys(THEMES);
   assert.equal(themeIds.length, 4);
 
-  const fontPairings = new Set<string>();
+  const fontPairings = new Set();
   for (const id of themeIds) {
     const t = THEMES[id];
     const audit = verifyThemeContrast(t);

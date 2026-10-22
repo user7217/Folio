@@ -5,36 +5,21 @@ import {
   EXTRACTOR_VERSION,
   extractArticle,
   parseFeedXml,
-} from '../../../packages/article-processing/src/index.ts';
-import { ContainedDatabase, sha256Hex } from '../../../packages/db/src/index.ts';
-import type { FeedEntry, Job } from '../../../packages/shared/src/index.ts';
-import { uuidv7 } from '../../../packages/shared/src/index.ts';
-import type { DnsResolverFn, SafeFetchTransport } from '../../../packages/shared/src/ssrf.ts';
-import { SsrfError, safeFetch } from '../../../packages/shared/src/ssrf.ts';
-import { redactUrlForLog } from '../../../packages/shared/src/url.ts';
-
-export interface WorkerOptions {
-  workerId?: string;
-  staleTimeoutMs?: number;
-  resolver?: DnsResolverFn;
-  transport?: SafeFetchTransport;
-  allowedPorts?: number[];
-  simulateSlowHookMs?: number;
-}
+} from '../../../packages/article-processing/src/index.js';
+import { ContainedDatabase, sha256Hex } from '../../../packages/db/src/index.js';
+import { uuidv7 } from '../../../packages/shared/src/index.js';
+import { SsrfError, safeFetch } from '../../../packages/shared/src/ssrf.js';
+import { redactUrlForLog } from '../../../packages/shared/src/url.js';
 
 export class WorkerEngine {
-  public readonly db: ContainedDatabase;
-  public readonly workerId: string;
-  public readonly staleTimeoutMs: number;
-  private resolver?: DnsResolverFn;
-  private transport?: SafeFetchTransport;
-  private allowedPorts?: number[];
-  private simulateSlowHookMs: number;
-  private shuttingDown: boolean = false;
-  private activeJobIds: Set<string> = new Set();
-  private processedCount: number = 0;
+  db;
+  workerId;
+  staleTimeoutMs;
+  shuttingDown = false;
+  activeJobIds = new Set();
+  processedCount = 0;
 
-  constructor(db: ContainedDatabase, options: WorkerOptions = {}) {
+  constructor(db, options = {}) {
     this.db = db;
     this.workerId = options.workerId || `worker-${process.pid}-${crypto.randomBytes(3).toString('hex')}`;
     this.staleTimeoutMs = options.staleTimeoutMs ?? Number(process.env.WORKER_STALE_TIMEOUT_MS || 30_000);
@@ -44,13 +29,13 @@ export class WorkerEngine {
     this.simulateSlowHookMs = options.simulateSlowHookMs ?? 0;
   }
 
-  public setNetworkFixtures(resolver: DnsResolverFn, transport: SafeFetchTransport, allowedPorts?: number[]): void {
+  setNetworkFixtures(resolver, transport, allowedPorts) {
     this.resolver = resolver;
     this.transport = transport;
     this.allowedPorts = allowedPorts;
   }
 
-  public recordHeartbeat(): void {
+  recordHeartbeat() {
     this.db.transaction((st) => {
       st.worker_heartbeats[this.workerId] = {
         worker_id: this.workerId,
@@ -66,7 +51,7 @@ export class WorkerEngine {
    * Reclaims jobs stuck in `running` state past their `timeout_ms` or `staleTimeoutMs`
    * (e.g. when a worker process was killed with SIGKILL mid-job).
    */
-  public recoverStaleJobs(nowMs: number = Date.now()): number {
+  recoverStaleJobs(nowMs = Date.now()) {
     return this.db.transaction((st) => {
       let recovered = 0;
       const nowIso = new Date(nowMs).toISOString();
@@ -99,7 +84,7 @@ export class WorkerEngine {
   /**
    * Claims and executes the next eligible queued job. Returns null if no job is ready.
    */
-  public async processNextJob(nowMs: number = Date.now()): Promise<Job | null> {
+  async processNextJob(nowMs = Date.now()) {
     if (this.shuttingDown) return null;
     this.recoverStaleJobs(nowMs);
 
@@ -206,7 +191,7 @@ export class WorkerEngine {
     }
   }
 
-  public async drainQueue(maxJobs: number = 500): Promise<number> {
+  async drainQueue(maxJobs = 500) {
     let count = 0;
     while (count < maxJobs) {
       const res = await this.processNextJob(Date.now() + 60_000);
@@ -216,7 +201,7 @@ export class WorkerEngine {
     return count;
   }
 
-  private async executeJobPayload(job: Job): Promise<void> {
+  async executeJobPayload(job) {
     if (job.type === 'capture.extract') {
       const itemId = String(job.payload?.itemId || '');
       const item = this.db.read((st) => st.items[itemId]);
@@ -247,7 +232,7 @@ export class WorkerEngine {
       const extracted = extractArticle(rawHtml, fetchRes.finalUrl);
 
       // Check canonical URL possible duplicate (Section 6.4)
-      let possibleDuplicateOf: string | null = null;
+      let possibleDuplicateOf = null;
       if (extracted.canonicalUrl) {
         this.db.read((st) => {
           for (const other of Object.values(st.items)) {
@@ -306,7 +291,7 @@ export class WorkerEngine {
       const feed = this.db.read((st) => st.feeds[feedId]);
       if (!feed) return;
 
-      const reqHeaders: Record<string, string> = {};
+      const reqHeaders = {};
       if (feed.etag) reqHeaders['If-None-Match'] = feed.etag;
       if (feed.last_modified) reqHeaders['If-Modified-Since'] = feed.last_modified;
 
@@ -346,7 +331,7 @@ export class WorkerEngine {
           f.error_count = 0;
           f.updated_at = nowIso;
 
-          const existingKeys = new Set<string>();
+          const existingKeys = new Set();
           for (const entry of Object.values(st.feed_entries)) {
             if (entry.feed_id === feedId) {
               existingKeys.add(entry.dedup_key);
@@ -356,7 +341,7 @@ export class WorkerEngine {
           for (const pe of parsed.entries) {
             if (existingKeys.has(pe.dedupKey)) continue;
             existingKeys.add(pe.dedupKey);
-            const entry: FeedEntry = {
+            const entry = {
               id: uuidv7(),
               feed_id: feedId,
               owner_id: f.owner_id,
@@ -410,25 +395,37 @@ export class WorkerEngine {
     if (job.type === 'export.generate') {
       const exportId = String(job.payload?.exportId || '');
       const userId = String(job.payload?.userId || '');
-      const format = String(job.payload?.format || 'json') as 'json' | 'csv' | 'opml';
+      const format = String(job.payload?.format || 'json');
       const rawToken = String(job.payload?.rawToken || '');
+      const tokenHash = String(job.payload?.downloadTokenHash || (rawToken ? sha256Hex(rawToken) : ''));
 
       const payloadBuffer = this.db.read((st) => {
         const items = Object.values(st.items).filter((i) => this.db.canUserReadItem(userId, i));
         if (format === 'csv') {
           const rows = ['url,title,domain,status,created_at'];
           for (const it of items) {
-            const esc = (v: string) => `"${(v || '').replace(/"/g, '""')}"`;
+            const esc = (v) => {
+              const raw = v || '';
+              const safeFormula = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+              return `"${safeFormula.replace(/"/g, '""')}"`;
+            };
             rows.push([esc(it.url), esc(it.title), esc(it.domain), esc(it.processing_status), esc(it.created_at)].join(','));
           }
           return Buffer.from(rows.join('\n'), 'utf8');
         }
         if (format === 'opml') {
+          const xmlEsc = (s) =>
+            (s || '')
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+              .replace(/'/g, '&apos;');
           const feeds = Object.values(st.feeds).filter((f) => f.owner_id === userId);
           const outlines = feeds
             .map(
               (f) =>
-                `    <outline type="rss" text="${f.title.replace(/"/g, '&quot;')}" xmlUrl="${f.url.replace(/"/g, '&quot;')}" />`
+                `    <outline type="rss" text="${xmlEsc(f.title)}" xmlUrl="${xmlEsc(f.url)}" />`
             )
             .join('\n');
           const opml = `<?xml version="1.0" encoding="UTF-8"?>\n<opml version="2.0">\n  <head><title>Subscriptions</title></head>\n  <body>\n${outlines}\n  </body>\n</opml>`;
@@ -473,7 +470,7 @@ export class WorkerEngine {
           user_id: userId,
           format,
           blob_id: blobId,
-          download_token_hash: sha256Hex(rawToken),
+          download_token_hash: tokenHash,
           expires_at: new Date(Date.now() + 3600_000).toISOString(),
           created_at: new Date().toISOString(),
         };
@@ -482,7 +479,7 @@ export class WorkerEngine {
     }
   }
 
-  public requestGracefulShutdown(): void {
+  requestGracefulShutdown() {
     this.shuttingDown = true;
   }
 }
@@ -496,10 +493,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     simulateSlowHookMs: slowMs,
   });
 
+  let stopping = false;
   const handleSigterm = () => {
+    stopping = true;
     worker.requestGracefulShutdown();
     console.log(JSON.stringify({ level: 'info', event: 'worker.sigterm', workerId: worker.workerId }));
-    process.exit(0);
   };
   process.on('SIGTERM', handleSigterm);
   process.on('SIGINT', handleSigterm);
@@ -516,10 +514,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   );
 
   const loop = async () => {
-    while (true) {
+    while (!stopping) {
       await worker.processNextJob();
+      if (stopping) break;
       await new Promise((r) => setTimeout(r, pollInterval));
     }
+    process.exit(0);
   };
   loop().catch((err) => {
     console.error(JSON.stringify({ level: 'error', event: 'worker.fatal', message: String(err) }));

@@ -1,11 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { COMPONENT_ONLY_CSS } from '../packages/ui/src/index.ts';
+import { COMPONENT_ONLY_CSS } from '../packages/ui/src/index.js';
 
 const rootDir = process.env.PROJECT_ROOT || '/Users/harsha1/Documents/pocket_clone';
 
-function collectTsFiles(dir: string): string[] {
-  const out: string[] = [];
+function collectTsFiles(dir) {
+  const out = [];
   if (!fs.existsSync(dir)) return out;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === 'dist' || entry.name === 'data') {
@@ -14,7 +14,7 @@ function collectTsFiles(dir: string): string[] {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       out.push(...collectTsFiles(full));
-    } else if (entry.isFile() && entry.name.endsWith('.ts')) {
+    } else if (entry.isFile() && entry.name.endsWith('.js')) {
       out.push(full);
     }
   }
@@ -29,7 +29,7 @@ const files = [
   ...collectTsFiles(path.join(rootDir, 'benchmark')),
 ];
 
-const graph = new Map<string, string[]>();
+const graph = new Map();
 const secretPatterns = [
   /AKIA[0-9A-Z]{16}/,
   /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
@@ -37,7 +37,7 @@ const secretPatterns = [
   /sk-[A-Za-z0-9]{32,}/,
 ];
 
-const errors: string[] = [];
+const errors = [];
 
 for (const file of files) {
   const content = fs.readFileSync(file, 'utf8');
@@ -47,9 +47,9 @@ for (const file of files) {
     }
   }
 
-  const imports: string[] = [];
+  const imports = [];
   const importRe = /from\s+['"](\.[^'"]+)['"]/g;
-  let m: RegExpExecArray | null;
+  let m;
   while ((m = importRe.exec(content)) !== null) {
     const resolved = path.resolve(path.dirname(file), m[1]);
     imports.push(resolved);
@@ -58,10 +58,10 @@ for (const file of files) {
 }
 
 // Detect circular dependencies via DFS
-const visited = new Set<string>();
-const inStack = new Set<string>();
+const visited = new Set();
+const inStack = new Set();
 
-function dfs(node: string, chain: string[]): void {
+function dfs(node, chain) {
   if (inStack.has(node)) {
     errors.push(`Circular dependency detected: ${[...chain, node].map((p) => path.relative(rootDir, p)).join(' -> ')}`);
     return;

@@ -3,18 +3,18 @@ import http from "node:http";
 import https from "node:https";
 import net from 'node:net';
 import zlib from 'node:zlib';
-import { parseAndNormalizeUrl, UrlValidationError } from './url.ts';
+import { parseAndNormalizeUrl, UrlValidationError } from './url.js';
 
 export class SsrfError extends Error {
-  public readonly code: string;
-  public readonly errorClass: 'permanent' | 'transient';
-  public readonly statusCode?: number;
+  code;
+  errorClass;
+  statusCode;
 
   constructor(
-    message: string,
-    code: string,
-    errorClass: 'permanent' | 'transient' = 'permanent',
-    statusCode?: number
+    message,
+    code,
+    errorClass = 'permanent',
+    statusCode
   ) {
     super(message);
     this.name = 'SsrfError';
@@ -44,14 +44,14 @@ const BLOCKED_HOSTNAMES = new Set([
  * octal, hexadecimal, shortened 1/2/3-part forms, or mixed radix) into a 32-bit unsigned integer.
  * Returns null if the string is not an IPv4 literal variant.
  */
-export function parseIpv4LiteralToUint32(host: string): number | null {
+export function parseIpv4LiteralToUint32(host) {
   const clean = host.trim().toLowerCase();
   if (!clean || clean.includes(':')) return null;
 
   const parts = clean.split('.');
   if (parts.length > 4) return null;
 
-  const parsePart = (part: string): number | null => {
+  const parsePart = (part) => {
     if (!part) return null;
     if (/^0x[0-9a-f]+$/i.test(part)) {
       const val = Number.parseInt(part.slice(2), 16);
@@ -68,7 +68,7 @@ export function parseIpv4LiteralToUint32(host: string): number | null {
     return null;
   };
 
-  const parsedParts: number[] = [];
+  const parsedParts = [];
   for (const p of parts) {
     const val = parsePart(p);
     if (val === null) return null;
@@ -95,7 +95,7 @@ export function parseIpv4LiteralToUint32(host: string): number | null {
   return null;
 }
 
-export function uint32ToIpv4String(num: number): string {
+export function uint32ToIpv4String(num) {
   return [
     (num >>> 24) & 0xff,
     (num >>> 16) & 0xff,
@@ -104,17 +104,17 @@ export function uint32ToIpv4String(num: number): string {
   ].join('.');
 }
 
-function inCidr32(ip: number, baseIp: number, prefixBits: number): boolean {
+function inCidr32(ip, baseIp, prefixBits) {
   if (prefixBits === 0) return true;
   const mask = prefixBits === 32 ? 0xffffffff : (~0 << (32 - prefixBits)) >>> 0;
   return (ip & mask) >>> 0 === (baseIp & mask) >>> 0;
 }
 
-function ip4(a: number, b: number, c: number, d: number): number {
+function ip4(a, b, c, d) {
   return ((a << 24) | (b << 16) | (c << 8) | d) >>> 0;
 }
 
-const BLOCKED_IPV4_RANGES: Array<{ base: number; bits: number; reason: string }> = [
+const BLOCKED_IPV4_RANGES = [
   { base: ip4(0, 0, 0, 0), bits: 8, reason: 'UNSPECIFIED_IPV4' },
   { base: ip4(10, 0, 0, 0), bits: 8, reason: 'PRIVATE_RFC1918_10' },
   { base: ip4(100, 64, 0, 0), bits: 10, reason: 'CGNAT_100_64' },
@@ -133,7 +133,7 @@ const BLOCKED_IPV4_RANGES: Array<{ base: number; bits: number; reason: string }>
   { base: ip4(255, 255, 255, 255), bits: 32, reason: 'BROADCAST_IPV4' },
 ];
 
-export function checkIpv4Uint32Safety(ipNum: number): { safe: boolean; reason?: string } {
+export function checkIpv4Uint32Safety(ipNum) {
   for (const r of BLOCKED_IPV4_RANGES) {
     if (inCidr32(ipNum, r.base, r.bits)) {
       return { safe: false, reason: r.reason };
@@ -145,7 +145,7 @@ export function checkIpv4Uint32Safety(ipNum: number): { safe: boolean; reason?: 
 /**
  * Parses an IPv6 address (with optional brackets stripped) into 8 16-bit groups.
  */
-export function parseIpv6Groups(raw: string): number[] | null {
+export function parseIpv6Groups(raw) {
   let addr = raw.trim().toLowerCase();
   if (addr.startsWith('[') && addr.endsWith(']')) {
     addr = addr.slice(1, -1);
@@ -182,7 +182,7 @@ export function parseIpv6Groups(raw: string): number[] | null {
   return [...left, ...new Array(missing).fill(0), ...right];
 }
 
-export function checkIpSafety(ipOrLiteral: string): { safe: boolean; normalizedIp?: string; reason?: string } {
+export function checkIpSafety(ipOrLiteral) {
   const clean = ipOrLiteral.trim().replace(/^\[|\]$/g, '');
   if (clean.includes('%')) {
     return { safe: false, reason: 'IPV6_ZONE_ID_BLOCKED' };
@@ -210,14 +210,14 @@ export function checkIpSafety(ipOrLiteral: string): { safe: boolean; normalizedI
     if (groups.slice(0, 7).every((g) => g === 0) && groups[7] === 1) {
       return { safe: false, reason: 'LOOPBACK_IPV6' };
     }
-    // IPv4-mapped ::ffff:0:0/96 or ::ffff:0:w.x.y.z
+    // IPv4-mapped ::ffff:0:0/96, IPv4-compatible ::/96, or SIIT IPv4-translated ::ffff:0:0:0/96 (::ffff:0:w.x.y.z)
     if (
       groups[0] === 0 &&
       groups[1] === 0 &&
       groups[2] === 0 &&
       groups[3] === 0 &&
-      groups[4] === 0 &&
-      (groups[5] === 0xffff || groups[5] === 0)
+      ((groups[4] === 0 && (groups[5] === 0xffff || groups[5] === 0)) ||
+        (groups[4] === 0xffff && groups[5] === 0))
     ) {
       const embeddedV4 = ((groups[6] << 16) | groups[7]) >>> 0;
       const v4Check = checkIpv4Uint32Safety(embeddedV4);
@@ -226,8 +226,11 @@ export function checkIpSafety(ipOrLiteral: string): { safe: boolean; normalizedI
       }
       return { safe: true, normalizedIp: clean };
     }
-    // NAT64 64:ff9b::/96
+    // NAT64 64:ff9b::/96 (RFC 6052) and 64:ff9b:1::/48 (RFC 8215 local-use NAT64)
     if (groups[0] === 0x0064 && groups[1] === 0xff9b) {
+      if (groups[2] === 0x0001) {
+        return { safe: false, reason: 'NAT64_LOCAL_USE_IPV6' };
+      }
       const embeddedV4 = ((groups[6] << 16) | groups[7]) >>> 0;
       const v4Check = checkIpv4Uint32Safety(embeddedV4);
       if (!v4Check.safe) {
@@ -273,35 +276,14 @@ export function checkIpSafety(ipOrLiteral: string): { safe: boolean; normalizedI
   return { safe: false, reason: 'INVALID_IP_ADDRESS' };
 }
 
-export interface DnsLookupRecord {
-  address: string;
-  family: 4 | 6;
-}
-
-export type DnsResolverFn = (hostname: string) => Promise<DnsLookupRecord[]>;
-
-export interface ValidateDestinationOptions {
-  allowedPorts?: number[];
-  resolver?: DnsResolverFn;
-}
-
-export interface PinnedDestination {
-  normalizedUrl: string;
-  hostname: string;
-  pinnedIp: string;
-  family: 4 | 6;
-  port: number;
-  protocol: 'http:' | 'https:';
-}
-
 /**
  * Validates a URL's scheme, credentials, port, hostname, and resolved IP addresses,
  * returning the pinned IP address to connect to directly (preventing DNS rebinding).
  */
 export async function validateAndPinDestination(
-  rawUrl: string,
-  options: ValidateDestinationOptions = {}
-): Promise<PinnedDestination> {
+  rawUrl,
+  options = {}
+) {
   // Pre-check raw host before URL constructor normalizes exotic IPv4 encodings
   const schemeMatch = /^([a-zA-Z][a-zA-Z0-9+.-]*):\/\/(.*)$/.exec(rawUrl.trim());
   if (!schemeMatch) {
@@ -312,7 +294,7 @@ export async function validateAndPinDestination(
     throw new SsrfError(`Disallowed scheme: ${scheme}`, 'DISALLOWED_SCHEME', 'permanent');
   }
 
-  const authorityPart = schemeMatch[2].split(/[/?#]/)[0];
+  const authorityPart = schemeMatch[2].split(/[/?#\\]/)[0];
   if (authorityPart.includes('@')) {
     throw new SsrfError('Embedded credentials in URL are forbidden', 'EMBEDDED_CREDENTIALS', 'permanent');
   }
@@ -379,11 +361,11 @@ export async function validateAndPinDestination(
   }
 
   // Resolve DNS and validate ALL returned records
-  const resolver: DnsResolverFn =
+  const resolver =
     options.resolver ||
     (async () => {
       const lookedUp = await dns.promises.lookup(hostname, { all: true });
-      return lookedUp.map((r) => ({ address: r.address, family: (r.family === 6 ? 6 : 4) as 4 | 6 }));
+      return lookedUp.map((r) => ({ address: r.address, family: (r.family === 6 ? 6 : 4) }));
     });
 
   const records = await resolver(hostname);
@@ -414,43 +396,6 @@ export async function validateAndPinDestination(
   };
 }
 
-export interface SafeFetchRequest {
-  url: string;
-  pinnedIp: string;
-  hostname: string;
-  headers: Record<string, string>;
-}
-
-export interface RawTransportResponse {
-  status: number;
-  headers: Record<string, string>;
-  body: Buffer | AsyncIterable<Buffer>;
-}
-
-export type SafeFetchTransport = (req: SafeFetchRequest, signal: AbortSignal) => Promise<RawTransportResponse>;
-
-export interface SafeFetchOptions {
-  resolver?: DnsResolverFn;
-  transport?: SafeFetchTransport;
-  allowedPorts?: number[];
-  maxRedirects?: number;
-  maxBytes?: number;
-  maxDecompressedBytes?: number;
-  timeoutMs?: number;
-  allowedMimePrefixes?: string[];
-  headers?: Record<string, string>;
-}
-
-export interface SafeFetchResponse {
-  finalUrl: string;
-  pinnedIp: string;
-  status: number;
-  headers: Record<string, string>;
-  body: Buffer;
-  contentType: string;
-  redirectChain: string[];
-}
-
 const DEFAULT_ALLOWED_MIMES = [
   'text/html',
   'application/xhtml+xml',
@@ -473,15 +418,15 @@ const DEFAULT_ALLOWED_MIMES = [
  * - Strict MIME validation and malformed header rejection
  * - Permanent vs transient error classification
  */
-export async function safeFetch(rawUrl: string, options: SafeFetchOptions = {}): Promise<SafeFetchResponse> {
+export async function safeFetch(rawUrl, options = {}) {
   const maxRedirects = options.maxRedirects ?? 5;
   const maxBytes = options.maxBytes ?? 5 * 1024 * 1024; // 5 MB default
   const maxDecompressedBytes = options.maxDecompressedBytes ?? 10 * 1024 * 1024; // 10 MB default
   const timeoutMs = options.timeoutMs ?? 10_000;
   const allowedMimes = options.allowedMimePrefixes ?? DEFAULT_ALLOWED_MIMES;
 
-  const visitedUrls = new Set<string>();
-  const redirectChain: string[] = [];
+  const visitedUrls = new Set();
+  const redirectChain = [];
   let currentUrl = rawUrl;
 
   for (let hop = 0; hop <= maxRedirects; hop++) {
@@ -495,7 +440,7 @@ export async function safeFetch(rawUrl: string, options: SafeFetchOptions = {}):
     }
     visitedUrls.add(pinned.normalizedUrl);
 
-    const activeTransport: SafeFetchTransport = options.transport || ((req, signal) => new Promise((resolve, reject) => {
+    const activeTransport = options.transport || ((req, signal) => new Promise((resolve, reject) => {
       const u = new URL(req.url);
       const isHttps = u.protocol === "https:";
       const mod = isHttps ? https : http;
@@ -508,7 +453,7 @@ export async function safeFetch(rawUrl: string, options: SafeFetchOptions = {}):
         servername: req.hostname,
         signal,
       }, (res) => {
-        const hdrs: Record<string, string> = {};
+        const hdrs = {};
         for (const [k, v] of Object.entries(res.headers)) {
           if (v !== undefined) hdrs[k] = Array.isArray(v) ? v.join(", ") : String(v);
         }
@@ -521,7 +466,7 @@ export async function safeFetch(rawUrl: string, options: SafeFetchOptions = {}):
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(new SsrfError('Fetch timed out', 'FETCH_TIMEOUT', 'transient')), timeoutMs);
 
-    let rawRes: RawTransportResponse;
+    let rawRes;
     try {
       rawRes = await activeTransport(
         {
@@ -552,10 +497,21 @@ export async function safeFetch(rawUrl: string, options: SafeFetchOptions = {}):
       clearTimeout(timer);
     }
 
+    const destroyRawBody = () => {
+      if (
+        !Buffer.isBuffer(rawRes.body) &&
+        rawRes.body &&
+        typeof (rawRes.body).destroy === 'function'
+      ) {
+        (rawRes.body).destroy();
+      }
+    };
+
     // Validate response headers for malformed CRLF or control characters
-    const normalizedHeaders: Record<string, string> = {};
+    const normalizedHeaders = {};
     for (const [k, v] of Object.entries(rawRes.headers || {})) {
       if (/[\r\n\u0000]/.test(k) || /[\r\n\u0000]/.test(String(v))) {
+        destroyRawBody();
         throw new SsrfError('Malformed response header containing control characters', 'MALFORMED_HEADERS', 'permanent');
       }
       normalizedHeaders[k.toLowerCase()] = String(v);
@@ -563,6 +519,7 @@ export async function safeFetch(rawUrl: string, options: SafeFetchOptions = {}):
 
     // Check redirect statuses (301, 302, 303, 307, 308)
     if ([301, 302, 303, 307, 308].includes(rawRes.status)) {
+      destroyRawBody();
       if (hop === maxRedirects) {
         throw new SsrfError(`Maximum redirects (${maxRedirects}) exceeded`, 'MAX_REDIRECTS_EXCEEDED', 'permanent');
       }
@@ -570,7 +527,7 @@ export async function safeFetch(rawUrl: string, options: SafeFetchOptions = {}):
       if (!location) {
         throw new SsrfError('Redirect response missing Location header', 'INVALID_REDIRECT', 'permanent');
       }
-      let nextUrl: string;
+      let nextUrl;
       try {
         nextUrl = new URL(location, pinned.normalizedUrl).toString();
       } catch {
@@ -583,6 +540,7 @@ export async function safeFetch(rawUrl: string, options: SafeFetchOptions = {}):
 
     // Check 304 Not Modified (for conditional GET in feeds)
     if (rawRes.status === 304) {
+      destroyRawBody();
       return {
         finalUrl: pinned.normalizedUrl,
         pinnedIp: pinned.pinnedIp,
@@ -596,6 +554,7 @@ export async function safeFetch(rawUrl: string, options: SafeFetchOptions = {}):
 
     // Classify HTTP error statuses
     if (rawRes.status >= 400) {
+      destroyRawBody();
       const isTransient = rawRes.status === 408 || rawRes.status === 429 || rawRes.status >= 500;
       throw new SsrfError(
         `HTTP error status ${rawRes.status}`,
@@ -609,6 +568,7 @@ export async function safeFetch(rawUrl: string, options: SafeFetchOptions = {}):
     if (normalizedHeaders['content-length']) {
       const cl = Number.parseInt(normalizedHeaders['content-length'], 10);
       if (Number.isFinite(cl) && cl > maxBytes) {
+        destroyRawBody();
         throw new SsrfError(
           `Response Content-Length (${cl}) exceeds limit (${maxBytes})`,
           'BODY_TOO_LARGE',
@@ -622,11 +582,12 @@ export async function safeFetch(rawUrl: string, options: SafeFetchOptions = {}):
     const mimeType = rawContentType.split(';')[0].trim().toLowerCase();
     const mimeAllowed = allowedMimes.some((prefix) => mimeType === prefix.toLowerCase() || mimeType.startsWith(prefix.toLowerCase()));
     if (!mimeAllowed) {
+      destroyRawBody();
       throw new SsrfError(`Disallowed MIME type: ${mimeType}`, 'UNEXPECTED_MIME_TYPE', 'permanent');
     }
 
     // Read streaming body enforcing maxBytes
-    const chunks: Buffer[] = [];
+    const chunks = [];
     let totalBytes = 0;
     if (Buffer.isBuffer(rawRes.body)) {
       if (rawRes.body.length > maxBytes) {
@@ -639,6 +600,7 @@ export async function safeFetch(rawUrl: string, options: SafeFetchOptions = {}):
         const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
         totalBytes += buf.length;
         if (totalBytes > maxBytes) {
+          destroyRawBody();
           throw new SsrfError(`Streaming response exceeded byte cap (${maxBytes})`, 'BODY_TOO_LARGE', 'permanent');
         }
         chunks.push(buf);

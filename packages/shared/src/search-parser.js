@@ -1,63 +1,12 @@
-import type { ContentType } from './index.ts';
 
-export type SearchStateFilter = 'unread' | 'read' | 'favorite' | 'archived';
 
-export interface SearchFilterNode {
-  kind: 'filter';
-  field: 'tag' | 'collection' | 'domain' | 'type' | 'is' | 'before' | 'after';
-  value: string;
-  negated: boolean;
-}
-
-export interface SearchTermNode {
-  kind: 'term';
-  value: string;
-  phrase: boolean;
-  negated: boolean;
-}
-
-export interface SearchOrNode {
-  kind: 'or';
-  left: SearchAstNode;
-  right: SearchAstNode;
-}
-
-export interface SearchAndNode {
-  kind: 'and';
-  children: SearchAstNode[];
-}
-
-export type SearchAstNode = SearchFilterNode | SearchTermNode | SearchOrNode | SearchAndNode;
-
-export interface SearchParseError {
-  position: number;
-  token: string;
-  message: string;
-}
-
-export interface SearchParseResult {
-  ok: boolean;
-  ast: SearchAstNode | null;
-  errors: SearchParseError[];
-  compiledSql: {
-    sql: string;
-    params: unknown[];
-  };
-}
-
-const VALID_TYPES = new Set<ContentType>(['article', 'pdf', 'epub', 'feed']);
-const VALID_STATES = new Set<SearchStateFilter>(['unread', 'read', 'favorite', 'archived']);
+const VALID_TYPES = new Set(['article', 'pdf', 'epub', 'feed']);
+const VALID_STATES = new Set(['unread', 'read', 'favorite', 'archived']);
 const FILTER_FIELDS = new Set(['tag', 'collection', 'domain', 'type', 'is', 'before', 'after']);
 
-interface RawToken {
-  text: string;
-  quoted: boolean;
-  pos: number;
-}
-
-function tokenizeQuery(input: string): { tokens: RawToken[]; errors: SearchParseError[] } {
-  const tokens: RawToken[] = [];
-  const errors: SearchParseError[] = [];
+function tokenizeQuery(input) {
+  const tokens = [];
+  const errors = [];
   let i = 0;
   const n = input.length;
 
@@ -94,8 +43,9 @@ function tokenizeQuery(input: string): { tokens: RawToken[]; errors: SearchParse
         });
       } else {
         tokens.push({
-          text: negPrefix ? `-"${phrase}"` : phrase,
+          text: phrase,
           quoted: true,
+          negated: negPrefix,
           pos: start,
         });
       }
@@ -110,6 +60,11 @@ function tokenizeQuery(input: string): { tokens: RawToken[]; errors: SearchParse
         let quotedVal = '';
         let closed = false;
         while (i < n) {
+          if (input[i] === '\\' && i + 1 < n) {
+            quotedVal += input[i + 1];
+            i += 2;
+            continue;
+          }
           if (input[i] === '"') {
             closed = true;
             i++;
@@ -139,15 +94,13 @@ function tokenizeQuery(input: string): { tokens: RawToken[]; errors: SearchParse
   return { tokens, errors };
 }
 
-function parseAtom(tok: RawToken, errors: SearchParseError[]): SearchFilterNode | SearchTermNode | null {
+function parseAtom(tok, errors) {
   if (tok.quoted) {
-    const isNeg = tok.text.startsWith('-"') && tok.text.endsWith('"');
-    const clean = isNeg ? tok.text.slice(2, -1) : tok.text;
     return {
       kind: 'term',
-      value: clean.trim(),
+      value: tok.text.trim(),
       phrase: true,
-      negated: isNeg,
+      negated: Boolean(tok.negated),
     };
   }
 
@@ -178,7 +131,7 @@ function parseAtom(tok: RawToken, errors: SearchParseError[]): SearchFilterNode 
       });
       return null;
     }
-    if (field === 'type' && !VALID_TYPES.has(val.toLowerCase() as ContentType)) {
+    if (field === 'type' && !VALID_TYPES.has(val.toLowerCase())) {
       errors.push({
         position: tok.pos,
         token: tok.text,
@@ -186,7 +139,7 @@ function parseAtom(tok: RawToken, errors: SearchParseError[]): SearchFilterNode 
       });
       return null;
     }
-    if (field === 'is' && !VALID_STATES.has(val.toLowerCase() as SearchStateFilter)) {
+    if (field === 'is' && !VALID_STATES.has(val.toLowerCase())) {
       errors.push({
         position: tok.pos,
         token: tok.text,
@@ -207,7 +160,7 @@ function parseAtom(tok: RawToken, errors: SearchParseError[]): SearchFilterNode 
 
     return {
       kind: 'filter',
-      field: field as SearchFilterNode['field'],
+      field: field,
       value: field === 'type' || field === 'is' || field === 'domain' ? val.toLowerCase() : val,
       negated,
     };
@@ -225,12 +178,12 @@ function parseAtom(tok: RawToken, errors: SearchParseError[]): SearchFilterNode 
  * Compiles an AST node into parameterized SQL (`$1, $2, ...`) so user input never enters SQL text directly.
  */
 function compileAstToParameterizedSql(
-  node: SearchAstNode | null,
-  params: unknown[]
-): string {
+  node,
+  params
+) {
   if (!node) return '1 = 1';
 
-  const addParam = (v: unknown): string => {
+  const addParam = (v) => {
     params.push(v);
     return `$${params.length}`;
   };
@@ -290,7 +243,7 @@ function compileAstToParameterizedSql(
  * Parses a search query string into a validated AST + parameterized SQL representation.
  * Precedence: `OR` binds tighter than implicit `AND` (`a b OR c` => `AND(a, OR(b, c))`).
  */
-export function parseSearchQuery(rawQuery: string): SearchParseResult {
+export function parseSearchQuery(rawQuery) {
   const trimmed = (rawQuery || '').trim();
   if (!trimmed) {
     return {
@@ -306,7 +259,7 @@ export function parseSearchQuery(rawQuery: string): SearchParseResult {
     return { ok: false, ast: null, errors, compiledSql: { sql: '1 = 0', params: [] } };
   }
 
-  const andChildren: SearchAstNode[] = [];
+  const andChildren = [];
   let i = 0;
 
   while (i < tokens.length) {
@@ -321,7 +274,7 @@ export function parseSearchQuery(rawQuery: string): SearchParseResult {
       continue;
     }
 
-    let leftNode: SearchAstNode | null = parseAtom(tok, errors);
+    let leftNode = parseAtom(tok, errors);
     i++;
 
     // OR binds tighter than implicit AND: consume chain of `OR <atom>`
@@ -356,14 +309,14 @@ export function parseSearchQuery(rawQuery: string): SearchParseResult {
     return { ok: false, ast: null, errors, compiledSql: { sql: '1 = 0', params: [] } };
   }
 
-  const ast: SearchAstNode | null =
+  const ast =
     andChildren.length === 0
       ? null
       : andChildren.length === 1
         ? andChildren[0]
         : { kind: 'and', children: andChildren };
 
-  const params: unknown[] = [];
+  const params = [];
   const sql = compileAstToParameterizedSql(ast, params);
 
   return {

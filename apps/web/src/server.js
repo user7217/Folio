@@ -1,16 +1,16 @@
 import http from 'node:http';
 import { pathToFileURL } from 'node:url';
-import { extractArticle } from '../../../packages/article-processing/src/index.ts';
-import { ContainedDatabase, hashPassword } from '../../../packages/db/src/index.ts';
-import { uuidv7 } from '../../../packages/shared/src/index.ts';
-import { WorkerEngine } from '../../worker/src/worker.ts';
-import { ReadingPlatformApp } from './app.ts';
+import { extractArticle } from '../../../packages/article-processing/src/index.js';
+import { ContainedDatabase, hashPassword } from '../../../packages/db/src/index.js';
+import { uuidv7 } from '../../../packages/shared/src/index.js';
+import { WorkerEngine } from '../../worker/src/worker.js';
+import { ReadingPlatformApp } from './app.js';
 
-function buildSvgDataUri(svgString: string): string {
+function buildSvgDataUri(svgString) {
   return `data:image/svg+xml;base64,${Buffer.from(svgString.trim(), 'utf8').toString('base64')}`;
 }
 
-export function seedShowcaseEssaysIfNeeded(db: ContainedDatabase): void {
+export function seedShowcaseEssaysIfNeeded(db) {
   db.transaction((st) => {
     const now = new Date().toISOString();
     let user = Object.values(st.users)[0];
@@ -316,11 +316,11 @@ export function seedShowcaseEssaysIfNeeded(db: ContainedDatabase): void {
   });
 }
 
-export function createHttpServer(app: ReadingPlatformApp): http.Server {
+export function createHttpServer(app) {
   const maxBodyBytes = Number(process.env.MAX_UPLOAD_BYTES || 55 * 1024 * 1024) + 5 * 1024 * 1024;
   return http.createServer(async (req, res) => {
     try {
-      const chunks: Buffer[] = [];
+      const chunks = [];
       let totalBytes = 0;
       for await (const chunk of req) {
         const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
@@ -335,7 +335,7 @@ export function createHttpServer(app: ReadingPlatformApp): http.Server {
         chunks.push(buf);
       }
       const rawBuf = Buffer.concat(chunks, totalBytes);
-    let parsedBody: unknown = undefined;
+    let parsedBody = undefined;
     if (rawBuf.length > 0) {
       const ct = (req.headers['content-type'] || '').toLowerCase();
       if (ct.includes('application/json')) {
@@ -349,7 +349,7 @@ export function createHttpServer(app: ReadingPlatformApp): http.Server {
       }
     }
 
-    const headers: Record<string, string> = {};
+    const headers = {};
     for (const [k, v] of Object.entries(req.headers)) {
       if (v !== undefined) {
         headers[k] = Array.isArray(v) ? v.join('; ') : String(v);

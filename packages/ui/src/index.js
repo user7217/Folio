@@ -1,9 +1,8 @@
 import zlib from 'node:zlib';
-import { escapeHtml } from '../../article-processing/src/index.ts';
-import type { Annotation, Item, ThemeId, ThemePreference, TocEntry, UserItemState, UserSettings } from '../../shared/src/index.ts';
-import { THEMES, parseHexRgb } from '../../shared/src/themes.ts';
+import { escapeHtml } from '../../article-processing/src/index.js';
+import { THEMES, parseHexRgb } from '../../shared/src/themes.js';
 
-export function generateThemeStylesheet(): string {
+export function generateThemeStylesheet() {
   const themeBlocks = Object.values(THEMES)
     .map(
       (t) => `
@@ -1207,7 +1206,7 @@ html, body {
 
 export const COMPONENT_ONLY_CSS = generateThemeStylesheet().split('/* COMPONENT_RULES */').pop() || '';
 
-export function renderInlineThemeBootstrapScript(defaultTheme: ThemePreference = 'editorial-light'): string {
+export function renderInlineThemeBootstrapScript(defaultTheme = 'editorial-light') {
   return `<script id="theme-bootstrap">
 (function() {
   try {
@@ -1226,24 +1225,7 @@ export function renderInlineThemeBootstrapScript(defaultTheme: ThemePreference =
 </script>`;
 }
 
-export interface RenderScreenOptions {
-  screen: 'library' | 'reader' | 'settings' | 'command-palette' | 'error-state' | 'pdf-reader';
-  theme: ThemeId;
-  view?: string;
-  userSettings?: UserSettings;
-  items?: Item[];
-  allItems?: Item[];
-  itemStates?: Record<string, UserItemState>;
-  revisionsByItemId?: Record<string, { sanitized_html: string; toc: TocEntry[] }>;
-  annotationsByItemId?: Record<string, Annotation[]>;
-  activeItem?: Item;
-  sanitizedReaderHtml?: string;
-  toc?: TocEntry[];
-  annotations?: Annotation[];
-  errorMessage?: string;
-}
-
-export function renderAppScreenHtml(opts: RenderScreenOptions): string {
+export function renderAppScreenHtml(opts) {
   const themeTokens = THEMES[opts.theme] || THEMES['editorial-light'];
   const items = opts.items || [];
   const allItems = opts.allItems || items;
@@ -1261,7 +1243,7 @@ export function renderAppScreenHtml(opts: RenderScreenOptions): string {
   const widthCh = readerSettings.width === 'narrow' ? '55ch' : readerSettings.width === 'wide' ? '78ch' : '65ch';
   const listLayout = opts.userSettings?.listLayout || 'comfortable';
 
-  const revisionsMap: Record<string, { sanitized_html: string; toc: TocEntry[] }> = {
+  const revisionsMap = {
     ...(opts.revisionsByItemId || {}),
   };
   if (opts.activeItem && opts.sanitizedReaderHtml) {
@@ -1270,7 +1252,7 @@ export function renderAppScreenHtml(opts: RenderScreenOptions): string {
       toc: opts.toc || [],
     };
   }
-  const annotationsMap: Record<string, Annotation[]> = {
+  const annotationsMap = {
     ...(opts.annotationsByItemId || {}),
   };
   if (opts.activeItem && opts.annotations) {
@@ -1279,7 +1261,7 @@ export function renderAppScreenHtml(opts: RenderScreenOptions): string {
 
   let mainContent = '';
   if (opts.screen === 'library') {
-    const viewLabels: Record<string, { title: string; subtitle: string }> = {
+    const viewLabels = {
       all: {
         title: 'Library',
         subtitle: 'Calm, distraction-free reading queue engineered for mobile and desktop long-form focus.',
@@ -1342,7 +1324,7 @@ export function renderAppScreenHtml(opts: RenderScreenOptions): string {
           ${
             hasInlineImg
               ? `<a href="${readerHref}" class="item-thumbnail" data-spa-reader="${escapeHtml(it.id)}" aria-label="Read ${escapeHtml(it.title)}">
-                  <img src="${escapeHtml(it.featured_image!)}" alt="${escapeHtml(it.title)}" loading="lazy" decoding="async" />
+                  <img src="${escapeHtml(it.featured_image)}" alt="${escapeHtml(it.title)}" loading="lazy" decoding="async" />
                 </a>`
               : ''
           }
@@ -1464,7 +1446,7 @@ export function renderAppScreenHtml(opts: RenderScreenOptions): string {
           ${
             showHeroFigure
               ? `<figure class="reader-hero-figure">
-                  <img src="${escapeHtml(active!.featured_image!)}" alt="${escapeHtml(active?.title || 'Featured illustration')}" loading="lazy" decoding="async" />
+                  <img src="${escapeHtml(active.featured_image)}" alt="${escapeHtml(active?.title || 'Featured illustration')}" loading="lazy" decoding="async" />
                   <figcaption>Featured illustration for “${escapeHtml(active?.title || '')}”</figcaption>
                 </figure>`
               : ''
@@ -2782,7 +2764,7 @@ export function renderAppScreenHtml(opts: RenderScreenOptions): string {
 </html>`;
 }
 
-export function renderThemeScreenshotPng(themeId: ThemeId, screen: RenderScreenOptions['screen']): Buffer {
+export function renderThemeScreenshotPng(themeId, screen) {
   const theme = THEMES[themeId];
   const width = 320;
   const height = 200;
@@ -2823,7 +2805,7 @@ export function renderThemeScreenshotPng(themeId: ThemeId, screen: RenderScreenO
     }
   }
 
-  const makeChunk = (type: string, data: Buffer): Buffer => {
+  const makeChunk = (type, data) => {
     const lenBuf = Buffer.alloc(4);
     lenBuf.writeUInt32BE(data.length, 0);
     const typeBuf = Buffer.from(type, 'ascii');

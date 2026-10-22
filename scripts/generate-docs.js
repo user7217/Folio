@@ -3,18 +3,15 @@ import path from 'node:path';
 
 const root = process.env.PROJECT_ROOT || '/Users/harsha1/Documents/pocket_clone';
 
-function writeDoc(relPath: string, content: string): void {
+function writeDoc(relPath, content) {
   const fullPath = path.join(root, relPath);
   fs.mkdirSync(path.dirname(fullPath), { recursive: true });
   fs.writeFileSync(fullPath, `${content.trim()}\n`, 'utf8');
 }
 
 // Find latest verification log files from evidence/verify-summary.json
-let verifySummary: {
-  timestamp: string;
-  overallStatus: string;
-  steps: Array<{ step: string; status: string; durationMs: number; logFile: string }>;
-} = {
+let verifySummary
+= {
   timestamp: new Date().toISOString(),
   overallStatus: 'passed',
   steps: [],
@@ -25,7 +22,7 @@ if (fs.existsSync(verifySummaryPath)) {
   verifySummary = JSON.parse(fs.readFileSync(verifySummaryPath, 'utf8'));
 }
 
-const logFor = (stepName: string) =>
+const logFor = (stepName) =>
   verifySummary.steps.find((s) => s.step === stepName)?.logFile || 'evidence/logs/latest.log';
 
 writeDoc(

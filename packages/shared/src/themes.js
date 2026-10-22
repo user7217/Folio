@@ -1,52 +1,6 @@
-import type { ThemeId } from './index.ts';
 
-export interface ThemeTokens {
-  id: ThemeId;
-  name: string;
-  description: string;
-  colors: {
-    bgPrimary: string;
-    bgElevated: string;
-    bgSubtle: string;
-    textPrimary: string;
-    textSecondary: string;
-    textMuted: string;
-    accent: string;
-    accentText: string;
-    border: string;
-    focusRing: string;
-    danger: string;
-    success: string;
-    warning: string;
-    highlightBg: string;
-    highlightText: string;
-  };
-  typography: {
-    fontUi: string;
-    fontReading: string;
-    fontMono: string;
-    scaleBasePx: number;
-    scaleRatio: number;
-    lineHeightBody: number;
-    lineHeightHeading: number;
-  };
-  layout: {
-    spacingUnitPx: number;
-    density: 'spacious' | 'balanced' | 'compact' | 'comfortable';
-    borderRadiusSm: string;
-    borderRadiusMd: string;
-    borderRadiusLg: string;
-    borderStyle: string;
-    borderWidth: string;
-    shadowSm: string;
-    shadowMd: string;
-    focusRingStyle: string;
-    motionDurationMs: number;
-    motionEasing: string;
-  };
-}
 
-export const THEMES: Record<ThemeId, ThemeTokens> = {
+export const THEMES = {
   'editorial-light': {
     id: 'editorial-light',
     name: 'Editorial Light',
@@ -229,7 +183,7 @@ export const THEMES: Record<ThemeId, ThemeTokens> = {
   },
 };
 
-export function parseHexRgb(hex: string): [number, number, number] {
+export function parseHexRgb(hex) {
   const clean = hex.trim().replace(/^#/, '');
   if (clean.length === 3) {
     return [
@@ -245,7 +199,7 @@ export function parseHexRgb(hex: string): [number, number, number] {
   ];
 }
 
-export function relativeLuminance(hex: string): number {
+export function relativeLuminance(hex) {
   const [r, g, b] = parseHexRgb(hex).map((v) => {
     const c = v / 255;
     return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
@@ -253,7 +207,7 @@ export function relativeLuminance(hex: string): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-export function contrastRatio(hex1: string, hex2: string): number {
+export function contrastRatio(hex1, hex2) {
   const l1 = relativeLuminance(hex1);
   const l2 = relativeLuminance(hex2);
   const lighter = Math.max(l1, l2);
@@ -261,21 +215,7 @@ export function contrastRatio(hex1: string, hex2: string): number {
   return Number(((lighter + 0.05) / (darker + 0.05)).toFixed(2));
 }
 
-export interface ThemeContrastAudit {
-  themeId: ThemeId;
-  passesWcagAA: boolean;
-  ratios: {
-    primaryOnBg: number;
-    secondaryOnBg: number;
-    mutedOnBg: number;
-    primaryOnElevated: number;
-    accentTextOnAccent: number;
-    focusOnBg: number;
-    highlightTextOnHighlight: number;
-  };
-}
-
-export function verifyThemeContrast(theme: ThemeTokens): ThemeContrastAudit {
+export function verifyThemeContrast(theme) {
   const c = theme.colors;
   const ratios = {
     primaryOnBg: contrastRatio(c.textPrimary, c.bgPrimary),

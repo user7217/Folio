@@ -4,8 +4,8 @@ import { pathToFileURL } from 'node:url';
 
 const rootDir = process.env.PROJECT_ROOT || '/Users/harsha1/Documents/pocket_clone';
 
-function collectModuleFiles(dir: string): string[] {
-  const out: string[] = [];
+function collectModuleFiles(dir) {
+  const out = [];
   if (!fs.existsSync(dir)) return out;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === 'dist' || entry.name === 'data') {
@@ -14,7 +14,7 @@ function collectModuleFiles(dir: string): string[] {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       out.push(...collectModuleFiles(full));
-    } else if (entry.isFile() && entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts')) {
+    } else if (entry.isFile() && entry.name.endsWith('.js') && !entry.name.endsWith('.test.js')) {
       out.push(full);
     }
   }

@@ -1,7 +1,6 @@
 import crypto from 'node:crypto';
 import zlib from 'node:zlib';
-import type { EpubSpineItem, OcrStatus, PdfPageContent, TocEntry } from '../../shared/src/index.ts';
-import { parseAndNormalizeUrl } from '../../shared/src/url.ts';
+import { parseAndNormalizeUrl } from '../../shared/src/url.js';
 
 export const EXTRACTOR_NAME = 'contained-readability';
 export const EXTRACTOR_VERSION = '2.1.0';
@@ -23,7 +22,7 @@ const DROP_WITH_CONTENT_TAGS = [
   'svg', 'math', 'form', 'noscript', 'template', 'head', 'nav', 'footer', 'aside'
 ];
 
-export function escapeHtml(str: string): string {
+export function escapeHtml(str) {
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -32,7 +31,7 @@ export function escapeHtml(str: string): string {
     .replace(/'/g, '&#39;');
 }
 
-export function decodeHtmlEntities(str: string): string {
+export function decodeHtmlEntities(str) {
   return str
     .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => {
       const cp = Number.parseInt(hex, 16);
@@ -50,7 +49,7 @@ export function decodeHtmlEntities(str: string): string {
     .replace(/&amp;/gi, '&');
 }
 
-function sanitizeUrlAttr(rawVal: string, baseUrl: string, allowRelative: boolean = true): string | null {
+function sanitizeUrlAttr(rawVal, baseUrl, allowRelative = true) {
   const decoded = decodeHtmlEntities(rawVal).replace(/[\u0000-\u0020\u007f]+/g, '').trim();
   if (!decoded) return null;
   if (/^(javascript|vbscript|data|file|blob|ws|wss):/i.test(decoded)) {
@@ -70,7 +69,7 @@ function sanitizeUrlAttr(rawVal: string, baseUrl: string, allowRelative: boolean
   }
 }
 
-export function sanitizeImageUrlAttr(rawVal: string, baseUrl: string): string | null {
+export function sanitizeImageUrlAttr(rawVal, baseUrl) {
   const decoded = decodeHtmlEntities(rawVal).replace(/[\u0000-\u0020\u007f]+/g, '').trim();
   if (!decoded) return null;
   // Allow safe base64-encoded raster or SVG data URIs on <img>
@@ -84,7 +83,7 @@ export function sanitizeImageUrlAttr(rawVal: string, baseUrl: string): string | 
   return sanitizeUrlAttr(decoded, baseUrl, true);
 }
 
-function extractFirstSrcFromSrcset(rawSrcset: string): string | null {
+function extractFirstSrcFromSrcset(rawSrcset) {
   const decoded = decodeHtmlEntities(rawSrcset).trim();
   if (!decoded) return null;
   const firstCandidate = decoded.split(',')[0]?.trim();
@@ -100,7 +99,7 @@ function extractFirstSrcFromSrcset(rawSrcset: string): string | null {
  * - Rewrites relative URLs against baseUrl and promotes lazy-loaded image attributes (data-src, data-original, srcset)
  * - Enforces rel="noopener noreferrer" on links
  */
-export function sanitizeHtml(dirtyHtml: string, baseUrl: string = 'https://example.com'): string {
+export function sanitizeHtml(dirtyHtml, baseUrl = 'https://example.com') {
   if (!dirtyHtml) return '';
 
   let cleaned = dirtyHtml.replace(/<!--[\s\S]*?-->/g, '');
@@ -124,10 +123,10 @@ export function sanitizeHtml(dirtyHtml: string, baseUrl: string = 'https://examp
   }
 
   // Process remaining HTML tags via state-machine tokenizer (allowing '>' inside quoted attributes)
-  const out: string[] = [];
+  const out = [];
   const tagRegex = /<\/?([a-zA-Z0-9:-]+)((?:"[^"]*"|'[^']*'|[^'">])*)>/g;
   let lastIndex = 0;
-  let match: RegExpExecArray | null;
+  let match;
 
   while ((match = tagRegex.exec(cleaned)) !== null) {
     const textChunk = cleaned.slice(lastIndex, match.index);
@@ -153,12 +152,12 @@ export function sanitizeHtml(dirtyHtml: string, baseUrl: string = 'https://examp
     }
 
     // Parse attributes safely
-    const safeAttrs: string[] = [];
-    let imgPrimarySrc: string | null = null;
-    let imgFallbackSrc: string | null = null;
-    let imgAlt: string | null = null;
+    const safeAttrs = [];
+    let imgPrimarySrc = null;
+    let imgFallbackSrc = null;
+    let imgAlt = null;
     const attrRegex = /([a-zA-Z0-9_:-]+)\s*(?:=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
-    let attrMatch: RegExpExecArray | null;
+    let attrMatch;
     while ((attrMatch = attrRegex.exec(attrString)) !== null) {
       const attrName = attrMatch[1].toLowerCase();
       const rawVal = attrMatch[2] ?? attrMatch[3] ?? attrMatch[4] ?? '';
@@ -244,7 +243,7 @@ export function sanitizeHtml(dirtyHtml: string, baseUrl: string = 'https://examp
   return out.join('').trim();
 }
 
-export function extractPlainText(html: string): string {
+export function extractPlainText(html) {
   return decodeHtmlEntities(
     html
       .replace(/<(script|style|head|svg|math)[^>]*>[\s\S]*?<\/\1>/gi, ' ')
@@ -257,34 +256,13 @@ export function extractPlainText(html: string): string {
     .trim();
 }
 
-export function computeReadingTimeMinutes(plainText: string): number {
+export function computeReadingTimeMinutes(plainText) {
   const words = plainText.trim().split(/\s+/).filter(Boolean).length;
   if (words === 0) return 1;
   return Math.max(1, Math.ceil(words / 200));
 }
 
-export interface ExtractedArticleResult {
-  status: 'ready' | 'partial';
-  title: string;
-  author: string | null;
-  publisher: string | null;
-  domain: string;
-  canonicalUrl: string | null;
-  publishedAt: string | null;
-  description: string | null;
-  featuredImage: string | null;
-  language: string | null;
-  readingTimeMinutes: number;
-  sanitizedHtml: string;
-  plainText: string;
-  toc: TocEntry[];
-  outboundUrls: string[];
-  contentHash: string;
-  extractorName: string;
-  extractorVersion: string;
-}
-
-function getMetaContent(html: string, namesOrProps: string[]): string | null {
+function getMetaContent(html, namesOrProps) {
   for (const name of namesOrProps) {
     const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const re1 = new RegExp(
@@ -307,17 +285,17 @@ function getMetaContent(html: string, namesOrProps: string[]): string | null {
 /**
  * Full extraction + URL rewriting + sanitization + derived field computation pipeline (Section 8.3).
  */
-export function extractArticle(rawHtml: string, pageUrl: string): ExtractedArticleResult {
+export function extractArticle(rawHtml, pageUrl) {
   const norm = parseAndNormalizeUrl(pageUrl);
   const baseUrl = norm.normalizedUrl;
 
   // JSON-LD metadata extraction if present
-  let jsonLdTitle: string | null = null;
-  let jsonLdAuthor: string | null = null;
-  let jsonLdDate: string | null = null;
-  let jsonLdPublisher: string | null = null;
-  let jsonLdDesc: string | null = null;
-  let jsonLdImage: string | null = null;
+  let jsonLdTitle = null;
+  let jsonLdAuthor = null;
+  let jsonLdDate = null;
+  let jsonLdPublisher = null;
+  let jsonLdDesc = null;
+  let jsonLdImage = null;
 
   const ldMatch = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i.exec(rawHtml);
   if (ldMatch) {
@@ -368,7 +346,7 @@ export function extractArticle(rawHtml: string, pageUrl: string): ExtractedArtic
     getMetaContent(rawHtml, ['og:url']) ||
     null;
 
-  let canonicalUrl: string | null = null;
+  let canonicalUrl = null;
   if (rawCanonical) {
     try {
       canonicalUrl = parseAndNormalizeUrl(new URL(rawCanonical, baseUrl).toString()).normalizedUrl;
@@ -383,7 +361,7 @@ export function extractArticle(rawHtml: string, pageUrl: string): ExtractedArtic
     jsonLdDate ||
     null;
 
-  let publishedAt: string | null = null;
+  let publishedAt = null;
   if (rawPublished && !Number.isNaN(Date.parse(rawPublished))) {
     publishedAt = new Date(rawPublished).toISOString();
   }
@@ -424,11 +402,11 @@ export function extractArticle(rawHtml: string, pageUrl: string): ExtractedArtic
   }
 
   // Extract headings and ensure each heading in sanitizedHtml has a deterministic id for TOC
-  const toc: TocEntry[] = [];
+  const toc = [];
   let headingCounter = 0;
   const htmlWithHeadingIds = sanitizedHtml.replace(
     /<(h[1-6])(\s[^>]*)?>([\s\S]*?)<\/\1>/gi,
-    (full, tag: string, attrs: string = '', inner: string) => {
+    (full, tag, attrs = '', inner) => {
       headingCounter++;
       const level = Number.parseInt(tag[1], 10);
       const text = extractPlainText(inner);
@@ -445,9 +423,9 @@ export function extractArticle(rawHtml: string, pageUrl: string): ExtractedArtic
   );
 
   // Extract outbound http(s) URLs from sanitizedHtml
-  const outboundSet = new Set<string>();
+  const outboundSet = new Set();
   const hrefRe = /<a[^>]+href="([^"]+)"/gi;
-  let hm: RegExpExecArray | null;
+  let hm;
   while ((hm = hrefRe.exec(htmlWithHeadingIds)) !== null) {
     try {
       const normHref = parseAndNormalizeUrl(hm[1]).normalizedUrl;
@@ -490,16 +468,10 @@ export function extractArticle(rawHtml: string, pageUrl: string): ExtractedArtic
   };
 }
 
-export interface DiscoveredFeed {
-  url: string;
-  title: string;
-  type: 'rss' | 'atom';
-}
-
-export function discoverFeedsFromHtml(html: string, baseUrl: string): DiscoveredFeed[] {
-  const feeds: DiscoveredFeed[] = [];
+export function discoverFeedsFromHtml(html, baseUrl) {
+  const feeds = [];
   const linkRe = /<link\b([^>]+)>/gi;
-  let m: RegExpExecArray | null;
+  let m;
   while ((m = linkRe.exec(html)) !== null) {
     const attrs = m[1];
     if (!/rel=["'][^"']*alternate[^"']*["']/i.test(attrs)) continue;
@@ -524,25 +496,7 @@ export function discoverFeedsFromHtml(html: string, baseUrl: string): Discovered
   return feeds;
 }
 
-export interface ParsedFeedEntry {
-  guid: string | null;
-  dedupKey: string;
-  url: string;
-  title: string;
-  author: string | null;
-  summary: string;
-  contentHtml: string;
-  publishedAt: string | null;
-}
-
-export interface ParsedFeed {
-  title: string;
-  description: string | null;
-  siteUrl: string | null;
-  entries: ParsedFeedEntry[];
-}
-
-function extractXmlTag(xml: string, tag: string): string | null {
+function extractXmlTag(xml, tag) {
   const re = new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${tag}>`, 'i');
   const m = re.exec(xml);
   if (!m) return null;
@@ -554,7 +508,7 @@ function extractXmlTag(xml: string, tag: string): string | null {
 /**
  * Hostile-safe RSS 2.0 and Atom 1.0 parser with XXE / DOCTYPE / ENTITY rejection (Section 5.1 & 8.5).
  */
-export function parseFeedXml(rawXml: string, feedUrl: string): ParsedFeed {
+export function parseFeedXml(rawXml, feedUrl) {
   if (!rawXml || typeof rawXml !== 'string') {
     throw new Error('Feed XML must be a non-empty string');
   }
@@ -581,9 +535,9 @@ export function parseFeedXml(rawXml: string, feedUrl: string): ParsedFeed {
     extractXmlTag(headerXml, 'link') ||
     null;
 
-  const entries: ParsedFeedEntry[] = [];
+  const entries = [];
   const blockRe = /<(item|entry)\b[^>]*>([\s\S]*?)<\/\1>/gi;
-  let bm: RegExpExecArray | null;
+  let bm;
   while ((bm = blockRe.exec(rawXml)) !== null) {
     const block = bm[2];
     const title = extractXmlTag(block, 'title') || 'Untitled Entry';
@@ -649,25 +603,16 @@ export function parseFeedXml(rawXml: string, feedUrl: string): ParsedFeed {
   };
 }
 
-export interface ParsedPdfResult {
-  title: string;
-  pageCount: number;
-  pages: PdfPageContent[];
-  plainText: string;
-  sanitizedHtml: string;
-  ocrStatus: OcrStatus;
-}
-
 /**
  * Validates and extracts text from a PDF buffer (Section 8.4).
  * Checks %PDF- magic bytes, enforces max size and page cap, extracts text streams,
  * and identifies scanned PDFs with no text layer.
  */
 export function parsePdfBuffer(
-  buffer: Buffer,
-  filename: string = 'document.pdf',
-  options: { maxBytes?: number; maxPages?: number } = {}
-): ParsedPdfResult {
+  buffer,
+  filename = 'document.pdf',
+  options = {}
+) {
   const maxBytes = options.maxBytes ?? 50 * 1024 * 1024;
   const maxPages = options.maxPages ?? 500;
 
@@ -690,13 +635,13 @@ export function parsePdfBuffer(
     throw new Error(`PDF page count (${declaredPageCount}) exceeds limit (${maxPages})`);
   }
 
-  const pages: PdfPageContent[] = [];
+  const pages = [];
   const btBlocks = Array.from(rawStr.matchAll(/BT\s+([\s\S]*?)\s+ET/g));
 
   if (btBlocks.length > 0) {
     for (let i = 0; i < btBlocks.length; i++) {
       const content = btBlocks[i][1];
-      const strings: string[] = [];
+      const strings = [];
       for (const sm of content.matchAll(/\(([^()\\]*(?:\\.[^()\\]*)*)\)\s*Tj/g)) {
         strings.push(sm[1].replace(/\\([()\\])/g, '$1'));
       }
@@ -719,7 +664,7 @@ export function parsePdfBuffer(
 
   const fullText = pages.map((p) => p.text).filter(Boolean).join('\n\n').trim();
   const hasTextLayer = fullText.length > 0;
-  const ocrStatus: OcrStatus = hasTextLayer ? 'none' : 'no_text_layer';
+  const ocrStatus = hasTextLayer ? 'none' : 'no_text_layer';
 
   const titleMatch = /\/Title\s*\(([^)]+)\)/.exec(rawStr);
   const title = titleMatch ? titleMatch[1].trim() : filename.replace(/\.pdf$/i, '');
@@ -743,17 +688,12 @@ export function parsePdfBuffer(
   };
 }
 
-export interface ZipEntryData {
-  name: string;
-  data: Buffer;
-}
-
 /**
  * Creates a standard uncompressed/deflate ZIP buffer for testing & packaging EPUBs or backups.
  */
-export function createZipArchive(entries: ZipEntryData[]): Buffer {
-  const localParts: Buffer[] = [];
-  const centralParts: Buffer[] = [];
+export function createZipArchive(entries) {
+  const localParts = [];
+  const centralParts = [];
   let offset = 0;
 
   for (const entry of entries) {
@@ -819,9 +759,9 @@ export function createZipArchive(entries: ZipEntryData[]): Buffer {
  * Extracts a ZIP archive with strict zip-slip, entry-count, and expanded-size (zip-bomb) limits.
  */
 export function extractZipSafely(
-  buffer: Buffer,
-  options: { maxEntries?: number; maxExpandedBytes?: number } = {}
-): Map<string, Buffer> {
+  buffer,
+  options = {}
+) {
   const maxEntries = options.maxEntries ?? 250;
   const maxExpandedBytes = options.maxExpandedBytes ?? 25 * 1024 * 1024;
 
@@ -829,7 +769,7 @@ export function extractZipSafely(
     throw new Error('Invalid ZIP/EPUB magic bytes: expected PK\\x03\\x04');
   }
 
-  const files = new Map<string, Buffer>();
+  const files = new Map();
   let pos = 0;
   let totalExpanded = 0;
   let entryCount = 0;
@@ -876,7 +816,7 @@ export function extractZipSafely(
     }
 
     const rawPayload = buffer.subarray(dataStart, dataEnd);
-    let expanded: Buffer;
+    let expanded;
     if (method === 0) {
       expanded = Buffer.from(rawPayload);
     } else if (method === 8) {
@@ -897,19 +837,10 @@ export function extractZipSafely(
   return files;
 }
 
-export interface ParsedEpubResult {
-  title: string;
-  author: string | null;
-  spine: EpubSpineItem[];
-  toc: TocEntry[];
-  sanitizedHtml: string;
-  plainText: string;
-}
-
 export function parseEpubBuffer(
-  buffer: Buffer,
-  options: { maxEntries?: number; maxExpandedBytes?: number } = {}
-): ParsedEpubResult {
+  buffer,
+  options = {}
+) {
   const entries = extractZipSafely(buffer, options);
 
   const containerXml = entries.get('META-INF/container.xml')?.toString('utf8');
@@ -932,7 +863,7 @@ export function parseEpubBuffer(
   const author = extractXmlTag(opfXml, 'dc:creator') || extractXmlTag(opfXml, 'creator') || null;
 
   // Map manifest item id -> href
-  const manifest = new Map<string, string>();
+  const manifest = new Map();
   for (const im of opfXml.matchAll(/<item\b([^>]+)>/gi)) {
     const attrs = im[1];
     const id = /id=["']([^"']+)["']/i.exec(attrs)?.[1];
@@ -942,8 +873,8 @@ export function parseEpubBuffer(
     }
   }
 
-  const spine: EpubSpineItem[] = [];
-  const toc: TocEntry[] = [];
+  const spine = [];
+  const toc = [];
   let idx = 0;
 
   for (const sm of opfXml.matchAll(/<itemref\b([^>]+)>/gi)) {

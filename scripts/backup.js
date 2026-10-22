@@ -2,24 +2,16 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { createZipArchive, type ZipEntryData } from '../packages/article-processing/src/index.ts';
-import { ContainedDatabase } from '../packages/db/src/index.ts';
+import { createZipArchive, } from '../packages/article-processing/src/index.js';
+import { ContainedDatabase } from '../packages/db/src/index.js';
 
-export interface BackupManifest {
-  backup_version: '2.0';
-  created_at: string;
-  schema_version: number;
-  db_sha256: string;
-  blobs: Array<{ blob_id: string; size_bytes: number; sha256: string }>;
-}
-
-export function createBackup(dataDir: string, outputArchivePath: string): BackupManifest {
+export function createBackup(dataDir, outputArchivePath) {
   const db = new ContainedDatabase(dataDir);
   const dbPayload = Buffer.from(JSON.stringify(db.read((s) => s), null, 2), 'utf8');
   const dbSha256 = crypto.createHash('sha256').update(dbPayload).digest('hex');
 
-  const blobEntries: ZipEntryData[] = [];
-  const manifestBlobs: BackupManifest['blobs'] = [];
+  const blobEntries = [];
+  const manifestBlobs = [];
 
   if (fs.existsSync(db.blobs.blobDir)) {
     for (const file of fs.readdirSync(db.blobs.blobDir)) {
@@ -32,7 +24,7 @@ export function createBackup(dataDir: string, outputArchivePath: string): Backup
     }
   }
 
-  const manifest: BackupManifest = {
+  const manifest = {
     backup_version: '2.0',
     created_at: new Date().toISOString(),
     schema_version: db.read((s) => s.schema_version),

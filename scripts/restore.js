@@ -2,12 +2,11 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { extractZipSafely } from '../packages/article-processing/src/index.ts';
-import type { BackupManifest } from './backup.ts';
+import { extractZipSafely } from '../packages/article-processing/src/index.js';
 
-export function restoreBackup(archivePath: string, targetDataDir: string): BackupManifest {
+export function restoreBackup(archivePath, targetDataDir) {
   const archiveBuf = fs.readFileSync(archivePath);
-  const entries = extractZipSafely(archiveBuf, { maxEntries: 5000, maxExpandedBytes: 250 * 1024 * 1024 });
+  const entries = extractZipSafely(archiveBuf, { maxEntries: 5000, maxExpandedBytes: 500 * 1024 * 1024 });
 
   const manifestBuf = entries.get('manifest.json');
   const dbBuf = entries.get('db.json');
@@ -15,7 +14,7 @@ export function restoreBackup(archivePath: string, targetDataDir: string): Backu
     throw new Error('Invalid backup archive: missing manifest.json or db.json');
   }
 
-  const manifest = JSON.parse(manifestBuf.toString('utf8')) as BackupManifest;
+  const manifest = JSON.parse(manifestBuf.toString('utf8'));
   const actualDbSha = crypto.createHash('sha256').update(dbBuf).digest('hex');
   if (actualDbSha !== manifest.db_sha256) {
     throw new Error('Backup integrity check failed: db.json SHA-256 mismatch');
@@ -26,6 +25,9 @@ export function restoreBackup(archivePath: string, targetDataDir: string): Backu
   fs.mkdirSync(blobDir, { recursive: true });
 
   for (const b of manifest.blobs) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(b.blob_id)) {
+      throw new Error(`Invalid blob ID in backup manifest: ${b.blob_id}`);
+    }
     const entryBuf = entries.get(`blobs/${b.blob_id}.bin`);
     if (!entryBuf) {
       throw new Error(`Missing blob in backup archive: ${b.blob_id}`);

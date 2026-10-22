@@ -1,19 +1,18 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ReadingPlatformApp } from '../apps/web/src/app.ts';
-import { WorkerEngine } from '../apps/worker/src/worker.ts';
-import { EXTRACTOR_NAME, EXTRACTOR_VERSION } from '../packages/article-processing/src/index.ts';
-import { ContainedDatabase, sha256Hex } from '../packages/db/src/index.ts';
-import type { ClientMutation, Item, ItemRevision } from '../packages/shared/src/index.ts';
-import { uuidv7 } from '../packages/shared/src/index.ts';
+import { ReadingPlatformApp } from '../apps/web/src/app.js';
+import { WorkerEngine } from '../apps/worker/src/worker.js';
+import { EXTRACTOR_NAME, EXTRACTOR_VERSION } from '../packages/article-processing/src/index.js';
+import { ContainedDatabase, sha256Hex } from '../packages/db/src/index.js';
+import { uuidv7 } from '../packages/shared/src/index.js';
 
 const rootDir = process.env.PROJECT_ROOT || '/Users/harsha1/Documents/pocket_clone';
 
 /**
  * Mulberry32 deterministic PRNG for reproducible benchmark datasets.
  */
-function createSeededPrng(seed: number): () => number {
+function createSeededPrng(seed) {
   let a = seed >>> 0;
   return () => {
     a |= 0;
@@ -24,16 +23,6 @@ function createSeededPrng(seed: number): () => number {
   };
 }
 
-export interface DatasetConfig {
-  seed: number;
-  users: number;
-  articles: number;
-  tags: number;
-  collections: number;
-  annotations: number;
-  wordsPerDocument: number;
-}
-
 const VOCAB = [
   'distributed', 'consensus', 'raft', 'paxos', 'storage', 'transaction', 'isolation',
   'serializable', 'snapshot', 'index', 'btree', 'lsm', 'compaction', 'wal', 'durability',
@@ -41,17 +30,11 @@ const VOCAB = [
   'embedding', 'lexical', 'ranking', 'bm25', 'trigram', 'security', 'sanitization',
 ];
 
-function computePercentiles(samplesMs: number[]): {
-  samples: number;
-  p50Ms: number;
-  p95Ms: number;
-  p99Ms: number | 'insufficient samples';
-  meanMs: number;
-  opsPerSec: number;
-} {
+function computePercentiles(samplesMs)
+{
   const sorted = [...samplesMs].sort((a, b) => a - b);
   const n = sorted.length;
-  const pick = (p: number) => Number(sorted[Math.min(n - 1, Math.floor(n * p))].toFixed(3));
+  const pick = (p) => Number(sorted[Math.min(n - 1, Math.floor(n * p))].toFixed(3));
   const mean = sorted.reduce((a, b) => a + b, 0) / Math.max(1, n);
   return {
     samples: n,
@@ -63,7 +46,7 @@ function computePercentiles(samplesMs: number[]): {
   };
 }
 
-export async function runDatasetBenchmark(config: DatasetConfig, label: string) {
+export async function runDatasetBenchmark(config, label) {
   const benchDir = path.join(rootDir, '.cache', `bench-${label}-${process.pid}-${Date.now()}`);
   fs.mkdirSync(benchDir, { recursive: true });
 
@@ -83,8 +66,8 @@ export async function runDatasetBenchmark(config: DatasetConfig, label: string) 
       path: '/api/auth/login',
       body: { email: 'bench0@example.com', password: 'BenchPassword123!' },
     });
-    const token0 = (login0.body as { sessionToken: string }).sessionToken;
-    const user0Id = (login0.body as { user: { id: string } }).user.id;
+    const token0 = (login0.body).sessionToken;
+    const user0Id = (login0.body).user.id;
 
     const invRes = await app.handleRequest({
       method: 'POST',
@@ -99,24 +82,24 @@ export async function runDatasetBenchmark(config: DatasetConfig, label: string) 
         username: 'benchuser1',
         email: 'bench1@example.com',
         password: 'BenchPassword123!',
-        inviteCode: (invRes.body as { inviteCode: string }).inviteCode,
+        inviteCode: (invRes.body).inviteCode,
       },
     });
-    const user1Id = (reg1.body as { id: string }).id;
+    const user1Id = (reg1.body).id;
     const login1 = await app.handleRequest({
       method: 'POST',
       path: '/api/auth/login',
       body: { email: 'bench1@example.com', password: 'BenchPassword123!' },
     });
-    const token1 = (login1.body as { sessionToken: string }).sessionToken;
+    const token1 = (login1.body).sessionToken;
 
     // Seed deterministic dataset inside a batch transaction
-    const sampleItemIds: string[] = [];
+    const sampleItemIds = [];
     let sharedCollectionId = '';
 
     db.transaction((st) => {
       const now = new Date().toISOString();
-      const tagIds: string[] = [];
+      const tagIds = [];
       for (let t = 0; t < config.tags; t++) {
         const tid = uuidv7();
         const name = t === 0 ? 'systems' : `tag-${t}`;
@@ -131,7 +114,7 @@ export async function runDatasetBenchmark(config: DatasetConfig, label: string) 
         tagIds.push(tid);
       }
 
-      const colIds: string[] = [];
+      const colIds = [];
       for (let c = 0; c < config.collections; c++) {
         const cid = uuidv7();
         st.collections[cid] = {
@@ -159,7 +142,7 @@ export async function runDatasetBenchmark(config: DatasetConfig, label: string) 
         const id = uuidv7(1700000000000 + i * 1000);
         if (i < 50) sampleItemIds.push(id);
         const domain = `bench${i % 20}.example.com`;
-        const words: string[] = [];
+        const words = [];
         for (let w = 0; w < config.wordsPerDocument; w++) {
           words.push(VOCAB[(i + w + Math.floor(rand() * VOCAB.length)) % VOCAB.length]);
         }
@@ -169,7 +152,7 @@ export async function runDatasetBenchmark(config: DatasetConfig, label: string) 
         const plainText = words.join(' ');
         const revId = uuidv7(1700000000000 + i * 1000 + 1);
 
-        const item: Item = {
+        const item = {
           id,
           owner_id: user0Id,
           url: `https://${domain}/articles/${i}`,
@@ -200,7 +183,7 @@ export async function runDatasetBenchmark(config: DatasetConfig, label: string) 
         };
         st.items[id] = item;
 
-        const rev: ItemRevision = {
+        const rev = {
           id: revId,
           item_id: id,
           revision_number: 1,
@@ -310,7 +293,7 @@ export async function runDatasetBenchmark(config: DatasetConfig, label: string) 
     }
 
     // Workload 1: Library first page (100 samples)
-    const libSamples: number[] = [];
+    const libSamples = [];
     for (let i = 0; i < 100; i++) {
       const t0 = performance.now();
       const res = await app.handleRequest({
@@ -323,7 +306,7 @@ export async function runDatasetBenchmark(config: DatasetConfig, label: string) 
     }
 
     // Workload 2: Full-text search (100 samples)
-    const searchSamples: number[] = [];
+    const searchSamples = [];
     let searchExplainPlan = '';
     for (let i = 0; i < 100; i++) {
       const t0 = performance.now();
@@ -334,12 +317,12 @@ export async function runDatasetBenchmark(config: DatasetConfig, label: string) 
       });
       searchSamples.push(performance.now() - t0);
       if (i === 0) {
-        searchExplainPlan = (res.body as { explain: { planText: string } }).explain.planText;
+        searchExplainPlan = (res.body).explain.planText;
       }
     }
 
     // Workload 3: Filtered search with operators (100 samples)
-    const filteredSearchSamples: number[] = [];
+    const filteredSearchSamples = [];
     let filteredExplainPlan = '';
     for (let i = 0; i < 100; i++) {
       const t0 = performance.now();
@@ -350,12 +333,12 @@ export async function runDatasetBenchmark(config: DatasetConfig, label: string) 
       });
       filteredSearchSamples.push(performance.now() - t0);
       if (i === 0) {
-        filteredExplainPlan = (res.body as { explain: { planText: string } }).explain.planText;
+        filteredExplainPlan = (res.body).explain.planText;
       }
     }
 
     // Workload 4: Opening an article (100 samples)
-    const openArticleSamples: number[] = [];
+    const openArticleSamples = [];
     for (let i = 0; i < 100; i++) {
       const targetId = sampleItemIds[i % sampleItemIds.length];
       const t0 = performance.now();
@@ -369,7 +352,7 @@ export async function runDatasetBenchmark(config: DatasetConfig, label: string) 
     }
 
     // Workload 9: Authorization checks on shared content (100 samples)
-    const authSharedSamples: number[] = [];
+    const authSharedSamples = [];
     for (let i = 0; i < 100; i++) {
       const t0 = performance.now();
       const res = await app.handleRequest({
@@ -382,7 +365,7 @@ export async function runDatasetBenchmark(config: DatasetConfig, label: string) 
     }
 
     // Workload 10: Graph neighborhood expansion (100 samples)
-    const graphSamples: number[] = [];
+    const graphSamples = [];
     for (let i = 0; i < 100; i++) {
       const t0 = performance.now();
       const res = await app.handleRequest({
@@ -465,14 +448,14 @@ export async function runDatasetBenchmark(config: DatasetConfig, label: string) 
     const batchTotalMs = Number((performance.now() - batchStart).toFixed(2));
 
     // Workload 7: Feed polling cycle (30 repetitions)
-    const feedSamples: number[] = [];
+    const feedSamples = [];
     const feedSub = await app.handleRequest({
       method: 'POST',
       path: '/api/feeds',
       headers: { 'x-session-token': token0 },
       body: { url: 'https://feedbench.example.com/rss.xml' },
     });
-    const feedId = (feedSub.body as { feed: { id: string } }).feed.id;
+    const feedId = (feedSub.body).feed.id;
     const feedWorker = new WorkerEngine(db, {
       resolver: async () => [{ address: '93.184.216.34', family: 4 }],
       transport: async () => ({
@@ -496,7 +479,7 @@ export async function runDatasetBenchmark(config: DatasetConfig, label: string) 
     }
 
     // Workload 8: Offline sync replay of 500 mutations
-    const mutations500: ClientMutation[] = Array.from({ length: 500 }, (_, m) => ({
+    const mutations500 = Array.from({ length: 500 }, (_, m) => ({
       mutation_id: uuidv7(),
       entity: 'item_state',
       entity_id: sampleItemIds[m % sampleItemIds.length],

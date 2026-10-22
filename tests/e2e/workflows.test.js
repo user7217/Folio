@@ -2,17 +2,16 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { ExtensionCaptureClient } from '../../apps/extension/extension-client.ts';
-import { ReadingPlatformApp } from '../../apps/web/src/app.ts';
-import { WorkerEngine } from '../../apps/worker/src/worker.ts';
-import { createZipArchive } from '../../packages/article-processing/src/index.ts';
-import { ContainedDatabase } from '../../packages/db/src/index.ts';
-import type { ThemeId } from '../../packages/shared/src/index.ts';
-import { THEMES, verifyThemeContrast } from '../../packages/shared/src/themes.ts';
+import { ExtensionCaptureClient } from '../../apps/extension/extension-client.js';
+import { ReadingPlatformApp } from '../../apps/web/src/app.js';
+import { WorkerEngine } from '../../apps/worker/src/worker.js';
+import { createZipArchive } from '../../packages/article-processing/src/index.js';
+import { ContainedDatabase } from '../../packages/db/src/index.js';
+import { THEMES, verifyThemeContrast } from '../../packages/shared/src/themes.js';
 
 const rootDir = process.env.PROJECT_ROOT || '/Users/harsha1/Documents/pocket_clone';
 
-function createE2eDataDir(name: string): string {
+function createE2eDataDir(name) {
   const d = path.join(rootDir, '.cache', `e2e-${name}-${process.pid}-${Date.now()}`);
   fs.mkdirSync(d, { recursive: true });
   return d;
@@ -21,7 +20,7 @@ function createE2eDataDir(name: string): string {
 /**
  * Automated accessibility & semantic HTML audit across rendered screens (Section 10 Accessibility).
  */
-function runHtmlAccessibilityChecks(html: string, screenName: string): void {
+function runHtmlAccessibilityChecks(html, screenName) {
   assert.match(html, /<!DOCTYPE html>/i, `${screenName}: missing DOCTYPE`);
   assert.match(html, /<html[^>]+lang="en"/i, `${screenName}: missing html[lang]`);
   assert.match(html, /<main\b[^>]*id="main-content"/i, `${screenName}: missing <main> landmark`);
@@ -79,7 +78,7 @@ test('E2E P0 Complete Workflow: bootstrap, invite registration, capture, retry f
       path: '/api/auth/login',
       body: { email: 'admin@example.com', password: 'AdminPassword123!' },
     });
-    const adminToken = (adminLogin.body as { sessionToken: string }).sessionToken;
+    const adminToken = (adminLogin.body).sessionToken;
 
     // 2. Invite-only registration for second user
     const noInviteReg = await app.handleRequest({
@@ -95,7 +94,7 @@ test('E2E P0 Complete Workflow: bootstrap, invite registration, capture, retry f
       headers: { 'x-session-token': adminToken },
       body: { email: 'reader1@example.com' },
     });
-    const inviteCode = (invRes.body as { inviteCode: string }).inviteCode;
+    const inviteCode = (invRes.body).inviteCode;
 
     const regRes = await app.handleRequest({
       method: 'POST',
@@ -112,7 +111,7 @@ test('E2E P0 Complete Workflow: bootstrap, invite registration, capture, retry f
       body: { url: 'https://example.com/first?utm_source=e2e' },
     });
     assert.equal(cap1.status, 201);
-    const item1Id = (cap1.body as { item: { id: string } }).item.id;
+    const item1Id = (cap1.body).item.id;
     await worker.drainQueue();
 
     // 4. Failed capture & retry flow
@@ -123,7 +122,7 @@ test('E2E P0 Complete Workflow: bootstrap, invite registration, capture, retry f
       headers: { 'x-session-token': adminToken },
       body: { url: 'https://example.com/second' },
     });
-    const item2Id = (capFail.body as { item: { id: string } }).item.id;
+    const item2Id = (capFail.body).item.id;
     await worker.drainQueue(); // exhausts retries and marks item failed
 
     const failedList = await app.handleRequest({
@@ -131,7 +130,7 @@ test('E2E P0 Complete Workflow: bootstrap, invite registration, capture, retry f
       path: '/api/items?view=failed',
       headers: { 'x-session-token': adminToken },
     });
-    assert.equal((failedList.body as { totalCount: number }).totalCount, 1);
+    assert.equal((failedList.body).totalCount, 1);
 
     // Retry the failed capture once network recovers
     failNextFetch = false;
@@ -148,11 +147,11 @@ test('E2E P0 Complete Workflow: bootstrap, invite registration, capture, retry f
       path: `/api/items/${item2Id}`,
       headers: { 'x-session-token': adminToken },
     });
-    assert.equal((afterRetry.body as { item: { processing_status: string } }).item.processing_status, 'ready');
+    assert.equal((afterRetry.body).item.processing_status, 'ready');
 
     // 5. All four themes + Reader settings + Accessibility checks
-    const screens = ['library', 'reader', 'settings', 'command-palette', 'error-state', 'pdf-reader'] as const;
-    for (const themeId of Object.keys(THEMES) as ThemeId[]) {
+    const screens = ['library', 'reader', 'settings', 'command-palette', 'error-state', 'pdf-reader'];
+    for (const themeId of Object.keys(THEMES)) {
       assert.equal(verifyThemeContrast(THEMES[themeId]).passesWcagAA, true);
       await app.handleRequest({
         method: 'PATCH',
@@ -192,7 +191,7 @@ test('E2E P0 Complete Workflow: bootstrap, invite registration, capture, retry f
       headers: { 'x-session-token': adminToken },
       body: { name: 'Engineering' },
     });
-    const parentColId = (parentColRes.body as { collection: { id: string } }).collection.id;
+    const parentColId = (parentColRes.body).collection.id;
 
     const childColRes = await app.handleRequest({
       method: 'POST',
@@ -200,7 +199,7 @@ test('E2E P0 Complete Workflow: bootstrap, invite registration, capture, retry f
       headers: { 'x-session-token': adminToken },
       body: { name: 'Distributed Systems', parentId: parentColId },
     });
-    const childColId = (childColRes.body as { collection: { id: string } }).collection.id;
+    const childColId = (childColRes.body).collection.id;
 
     // Moving parent into child must be rejected with 400 CYCLE_DETECTED
     const cycleRes = await app.handleRequest({
@@ -230,7 +229,7 @@ test('E2E P0 Complete Workflow: bootstrap, invite registration, capture, retry f
       path: '/api/items?view=archived',
       headers: { 'x-session-token': adminToken },
     });
-    assert.equal((archivedView.body as { totalCount: number }).totalCount, 1);
+    assert.equal((archivedView.body).totalCount, 1);
 
     await app.handleRequest({
       method: 'POST',
@@ -256,7 +255,7 @@ test('E2E P0 Complete Workflow: bootstrap, invite registration, capture, retry f
       headers: { 'x-session-token': adminToken },
     });
     assert.equal(searchOpRes.status, 200);
-    assert.equal((searchOpRes.body as { hits: unknown[] }).hits.length, 1);
+    assert.equal((searchOpRes.body).hits.length, 1);
 
     // 8. JSON Export and Import round-trip + dry-run mode
     const expStart = await app.handleRequest({
@@ -268,7 +267,7 @@ test('E2E P0 Complete Workflow: bootstrap, invite registration, capture, retry f
     assert.equal(expStart.status, 202);
     await worker.drainQueue();
 
-    const dlPath = (expStart.body as { downloadPath: string }).downloadPath;
+    const dlPath = (expStart.body).downloadPath;
     const dlRes = await app.handleRequest({
       method: 'GET',
       path: dlPath,
@@ -290,7 +289,7 @@ test('E2E P0 Complete Workflow: bootstrap, invite registration, capture, retry f
         content: '<a href="https://example.com/new-bookmark">New Bookmark</a>',
       },
     });
-    assert.equal((dryRunImport.body as { counts: { imported: number } }).counts.imported, 1);
+    assert.equal((dryRunImport.body).counts.imported, 1);
   } finally {
     fs.rmSync(dataDir, { recursive: true, force: true });
   }
@@ -320,7 +319,7 @@ test('E2E P1 & P2 Workflows: PDF/EPUB upload & download, MV3 Extension pairing &
       path: '/api/auth/login',
       body: { email: 'admin@example.com', password: 'AdminPassword123!' },
     });
-    const token = (login.body as { sessionToken: string }).sessionToken;
+    const token = (login.body).sessionToken;
 
     // 1. Extension pairing & capture flow
     const pairStart = await app.handleRequest({
@@ -329,8 +328,8 @@ test('E2E P1 & P2 Workflows: PDF/EPUB upload & download, MV3 Extension pairing &
       headers: { 'x-session-token': token },
       body: { name: 'Chromium Unpacked Extension' },
     });
-    const pairingCode = (pairStart.body as { pairingCode: string }).pairingCode;
-    const tokenId = (pairStart.body as { id: string }).id;
+    const pairingCode = (pairStart.body).pairingCode;
+    const tokenId = (pairStart.body).id;
 
     const extClient = new ExtensionCaptureClient('http://localhost:3000', async (url, init) => {
       const u = new URL(url);
@@ -340,7 +339,7 @@ test('E2E P1 & P2 Workflows: PDF/EPUB upload & download, MV3 Extension pairing &
         headers: init.headers,
         body: JSON.parse(init.body),
       });
-      return { status: res.status, body: res.body as Record<string, unknown> };
+      return { status: res.status, body: res.body };
     });
 
     // Unauthenticated state before pairing
@@ -383,7 +382,7 @@ test('E2E P1 & P2 Workflows: PDF/EPUB upload & download, MV3 Extension pairing &
       body: { filename: 'quantum.pdf', dataBase64: pdfBuf.toString('base64') },
     });
     assert.equal(pdfUp.status, 201);
-    const pdfItemId = (pdfUp.body as { item: { id: string } }).item.id;
+    const pdfItemId = (pdfUp.body).item.id;
 
     const pdfDl = await app.handleRequest({
       method: 'GET',
@@ -418,7 +417,7 @@ test('E2E P1 & P2 Workflows: PDF/EPUB upload & download, MV3 Extension pairing &
       body: { filename: 'handbook.epub', dataBase64: epubBuf.toString('base64') },
     });
     assert.equal(epubUp.status, 201);
-    const epubItemId = (epubUp.body as { item: { id: string } }).item.id;
+    const epubItemId = (epubUp.body).item.id;
 
     // 3. Knowledge Graph & Explainable Recommendations + Hybrid Search
     await app.handleRequest({
@@ -438,7 +437,7 @@ test('E2E P1 & P2 Workflows: PDF/EPUB upload & download, MV3 Extension pairing &
       headers: { 'x-session-token': token },
     });
     assert.equal(graphRes.status, 200);
-    assert.ok((graphRes.body as { nodes: unknown[] }).nodes.length >= 2);
+    assert.ok((graphRes.body).nodes.length >= 2);
 
     const recRes = await app.handleRequest({
       method: 'GET',
@@ -446,7 +445,7 @@ test('E2E P1 & P2 Workflows: PDF/EPUB upload & download, MV3 Extension pairing &
       headers: { 'x-session-token': token },
     });
     assert.equal(recRes.status, 200);
-    const recs = (recRes.body as { recommendations: Array<{ reasons: string[] }> }).recommendations;
+    const recs = (recRes.body).recommendations;
     assert.ok(recs.length >= 1);
     assert.ok(recs[0].reasons.length >= 1);
 
@@ -456,7 +455,7 @@ test('E2E P1 & P2 Workflows: PDF/EPUB upload & download, MV3 Extension pairing &
       headers: { 'x-session-token': token },
     });
     assert.equal(hybridSearch.status, 200);
-    assert.equal((hybridSearch.body as { mode: string }).mode, 'hybrid');
+    assert.equal((hybridSearch.body).mode, 'hybrid');
 
     // 4. Admin Diagnostics endpoint
     const diagRes = await app.handleRequest({
@@ -465,7 +464,7 @@ test('E2E P1 & P2 Workflows: PDF/EPUB upload & download, MV3 Extension pairing &
       headers: { 'x-session-token': token },
     });
     assert.equal(diagRes.status, 200);
-    assert.ok((diagRes.body as { workerHeartbeats: unknown[] }).workerHeartbeats.length >= 1);
+    assert.ok((diagRes.body).workerHeartbeats.length >= 1);
   } finally {
     fs.rmSync(dataDir, { recursive: true, force: true });
   }
@@ -533,7 +532,7 @@ test('E2E Long-Form Editorial GUI & Image Rendering: lazy data-src/srcset promot
       body: { url: 'https://typography.example.com/essays/figures' },
     });
     assert.equal(capRes.status, 201);
-    const itemId = (capRes.body as { item: { id: string } }).item.id;
+    const itemId = (capRes.body).item.id;
     await worker.drainQueue();
 
     // Verify Library GUI renders featured image thumbnail (fallback from first body <img>)

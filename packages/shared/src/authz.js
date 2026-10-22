@@ -1,36 +1,4 @@
-import type {
-  Annotation,
-  AuthPolicyName,
-  Collection,
-  CollectionMember,
-  ExportArtifact,
-  Feed,
-  Item,
-  User,
-} from './index.ts';
 
-export interface AuthActor {
-  user: User | null;
-  authType: 'session' | 'extension_token' | 'none';
-  sessionRevoked?: boolean;
-  tokenRevoked?: boolean;
-}
-
-export interface ResourceContext {
-  item?: Item | null;
-  itemSharedCollectionRoles?: Array<'owner' | 'editor' | 'viewer'>;
-  collection?: Collection | null;
-  collectionMember?: CollectionMember | null;
-  annotation?: Annotation | null;
-  feed?: Feed | null;
-  exportArtifact?: ExportArtifact | null;
-}
-
-export interface PolicyDecision {
-  allowed: boolean;
-  statusCode: 200 | 401 | 403 | 404;
-  reason: string;
-}
 
 /**
  * Central authorization policy evaluator `can(actor, policy, resource)`.
@@ -38,10 +6,10 @@ export interface PolicyDecision {
  * - Never reveals whether a private resource exists to an unauthorized user (returns 404 for private resources).
  */
 export function can(
-  actor: AuthActor,
-  policy: AuthPolicyName,
-  ctx: ResourceContext = {}
-): PolicyDecision {
+  actor,
+  policy,
+  ctx = {}
+) {
   if (policy === 'public') {
     return { allowed: true, statusCode: 200, reason: 'public_route' };
   }

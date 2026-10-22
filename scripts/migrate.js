@@ -1,7 +1,7 @@
 import { pathToFileURL } from 'node:url';
-import { ContainedDatabase } from '../packages/db/src/index.ts';
+import { ContainedDatabase } from '../packages/db/src/index.js';
 
-export function runMigrations(dataDir?: string) {
+export function runMigrations(dataDir) {
   const db = new ContainedDatabase(dataDir);
   const applied = db.migrate();
   return {

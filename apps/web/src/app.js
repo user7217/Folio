@@ -6,7 +6,7 @@ import {
   discoverFeedsFromHtml,
   parseEpubBuffer,
   parsePdfBuffer,
-} from '../../../packages/article-processing/src/index.ts';
+} from '../../../packages/article-processing/src/index.js';
 import {
   CURRENT_SCHEMA_VERSION,
   ContainedDatabase,
@@ -14,46 +14,15 @@ import {
   parseAndNormalizeUrl,
   sha256Hex,
   verifyPassword,
-} from '../../../packages/db/src/index.ts';
-import { buildTextAnchor } from '../../../packages/shared/src/anchoring.ts';
-import type { AuthActor, ResourceContext } from '../../../packages/shared/src/authz.ts';
-import { can } from '../../../packages/shared/src/authz.ts';
-import type {
-  Annotation,
-  ClientMutation,
-  Collection,
-  CollectionRole,
-  Item,
-  RouteDefinition,
-  ThemeId,
-  User,
-} from '../../../packages/shared/src/index.ts';
-import { ROUTE_REGISTRY, uuidv7 } from '../../../packages/shared/src/index.ts';
-import { THEMES } from '../../../packages/shared/src/themes.ts';
-import { UrlValidationError } from '../../../packages/shared/src/url.ts';
-import { renderAppScreenHtml } from '../../../packages/ui/src/index.ts';
+} from '../../../packages/db/src/index.js';
+import { buildTextAnchor } from '../../../packages/shared/src/anchoring.js';
+import { can } from '../../../packages/shared/src/authz.js';
+import { ROUTE_REGISTRY, uuidv7 } from '../../../packages/shared/src/index.js';
+import { THEMES } from '../../../packages/shared/src/themes.js';
+import { UrlValidationError } from '../../../packages/shared/src/url.js';
+import { renderAppScreenHtml } from '../../../packages/ui/src/index.js';
 
-export interface AppRequest {
-  method: string;
-  path: string; // e.g. '/api/items?view=inbox'
-  headers?: Record<string, string>;
-  body?: unknown;
-  rawBodyBytes?: number;
-  ip?: string;
-}
-
-export interface AppResponse {
-  status: number;
-  headers: Record<string, string>;
-  body: unknown;
-}
-
-interface MatchedRoute {
-  route: RouteDefinition;
-  params: Record<string, string>;
-}
-
-function matchRegisteredRoute(method: string, pathname: string): MatchedRoute | null {
+function matchRegisteredRoute(method, pathname) {
   const upperMethod = method.toUpperCase();
   const cleanPath = pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
   const reqSegs = cleanPath.split('/');
@@ -63,7 +32,7 @@ function matchRegisteredRoute(method: string, pathname: string): MatchedRoute | 
     const routeSegs = r.path.split('/');
     if (routeSegs.length !== reqSegs.length) continue;
 
-    const params: Record<string, string> = {};
+    const params = {};
     let matched = true;
     for (let i = 0; i < routeSegs.length; i++) {
       if (routeSegs[i].startsWith(':')) {
@@ -80,8 +49,8 @@ function matchRegisteredRoute(method: string, pathname: string): MatchedRoute | 
   return null;
 }
 
-function parseCookies(cookieHeader: string | undefined): Record<string, string> {
-  const out: Record<string, string> = {};
+function parseCookies(cookieHeader) {
+  const out = {};
   if (!cookieHeader) return out;
   for (const pair of cookieHeader.split(';')) {
     const idx = pair.indexOf('=');
@@ -95,21 +64,20 @@ function parseCookies(cookieHeader: string | undefined): Record<string, string> 
 }
 
 export class ReadingPlatformApp {
-  public readonly db: ContainedDatabase;
-  private rateLimitBuckets: Map<string, { count: number; resetAt: number }> = new Map();
-  private searchLatenciesMs: number[] = [];
-  private maxRequestBytes: number;
+  db;
+  rateLimitBuckets = new Map();
+  searchLatenciesMs = [];
 
-  constructor(db: ContainedDatabase, options: { maxRequestBytes?: number } = {}) {
+  constructor(db, options = {}) {
     this.db = db;
     this.maxRequestBytes = options.maxRequestBytes ?? 55 * 1024 * 1024;
   }
 
-  public resetRateLimits(): void {
+  resetRateLimits() {
     this.rateLimitBuckets.clear();
   }
 
-  private defaultSecurityHeaders(): Record<string, string> {
+  defaultSecurityHeaders() {
     return {
       'Content-Security-Policy':
         "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https: http: data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
@@ -119,11 +87,7 @@ export class ReadingPlatformApp {
     };
   }
 
-  private resolveActor(headers: Record<string, string>): {
-    actor: AuthActor;
-    sessionId: string | null;
-    csrfToken: string | null;
-  } {
+  resolveActor(headers) {
     const cookies = parseCookies(headers['cookie']);
     const sessionToken = cookies['rp_session'] || headers['x-session-token'];
     const authHeader = headers['authorization'] || '';
@@ -183,9 +147,9 @@ export class ReadingPlatformApp {
     return { actor: { user: null, authType: 'none' }, sessionId: null, csrfToken: null };
   }
 
-  private buildResourceContext(actor: AuthActor, params: Record<string, string>, routePath: string): ResourceContext {
+  buildResourceContext(actor, params, routePath) {
     return this.db.read((st) => {
-      const ctx: ResourceContext = {};
+      const ctx = {};
       const userId = actor.user?.id || '';
 
       if (routePath.startsWith('/api/items/:id') || routePath.startsWith('/api/documents/:id')) {
@@ -212,9 +176,9 @@ export class ReadingPlatformApp {
     });
   }
 
-  public async handleRequest(req: AppRequest): Promise<AppResponse> {
+  async handleRequest(req) {
     const baseHeaders = this.defaultSecurityHeaders();
-    const normHeaders: Record<string, string> = {};
+    const normHeaders = {};
     for (const [k, v] of Object.entries(req.headers || {})) {
       normHeaders[k.toLowerCase()] = String(v);
     }
@@ -300,7 +264,7 @@ export class ReadingPlatformApp {
       };
     }
 
-    const bodyObj = (req.body && typeof req.body === 'object' ? req.body : {}) as Record<string, unknown>;
+    const bodyObj = (req.body && typeof req.body === 'object' ? req.body : {});
 
     try {
       return await this.dispatchAuthorizedRoute(
@@ -322,16 +286,16 @@ export class ReadingPlatformApp {
     }
   }
 
-  private async dispatchAuthorizedRoute(
-    route: RouteDefinition,
-    params: Record<string, string>,
-    query: URLSearchParams,
-    body: Record<string, unknown>,
-    actor: AuthActor,
-    sessionId: string | null,
-    baseHeaders: Record<string, string>
-  ): Promise<AppResponse> {
-    const json = (status: number, payload: unknown, extraHeaders: Record<string, string> = {}): AppResponse => ({
+  async dispatchAuthorizedRoute(
+    route,
+    params,
+    query,
+    body,
+    actor,
+    sessionId,
+    baseHeaders
+  ) {
+    const json = (status, payload, extraHeaders = {}) => ({
       status,
       headers: { ...baseHeaders, 'Content-Type': 'application/json', ...extraHeaders },
       body: payload,
@@ -398,7 +362,7 @@ self.addEventListener('fetch', (e) => {
     }
 
     if (route.method === 'GET' && route.path === '/') {
-      let autoWebCookieHeader: Record<string, string> = {};
+      let autoWebCookieHeader = {};
       let effectiveUser = actor.user;
       if (!effectiveUser) {
         const autoSess = this.db.transaction((st) => {
@@ -441,35 +405,30 @@ self.addEventListener('fetch', (e) => {
         autoWebCookieHeader = { "Set-Cookie": `rp_session=${autoSess.rawTok}; HttpOnly; Path=/; SameSite=Lax` };
       }
       const viewFilter = query.get("view") || "all";
-      const screenParam = (query.get('screen') || 'library') as
-        | 'library'
-        | 'reader'
-        | 'settings'
-        | 'command-palette'
-        | 'error-state'
-        | 'pdf-reader';
+      const screenParam = (query.get('screen') || 'library')
+        ;
       const themeParam = (query.get('theme') ||
         (actor.user?.settings.theme && actor.user.settings.theme !== 'system'
           ? actor.user.settings.theme
-          : 'editorial-light')) as ThemeId;
-      const safeTheme: ThemeId = THEMES[themeParam] ? themeParam : 'editorial-light';
+          : 'editorial-light'));
+      const safeTheme = THEMES[themeParam] ? themeParam : 'editorial-light';
 
-      const itemStates: Record<string, import('../../../packages/shared/src/index.ts').UserItemState> = {};
-      const revisionsByItemId: Record<string, { sanitized_html: string; toc: import('../../../packages/shared/src/index.ts').TocEntry[] }> = {};
-      const annotationsByItemId: Record<string, Annotation[]> = {};
+      const itemStates = {};
+      const revisionsByItemId = {};
+      const annotationsByItemId = {};
 
       const allItems = effectiveUser
         ? this.db.read((st) =>
             Object.values(st.items).filter((i) => {
-              if (!this.db.canUserReadItem(effectiveUser!.id, i)) return false;
-              const uState = this.db.getOrCreateUserItemState(effectiveUser!.id, i.id);
+              if (!this.db.canUserReadItem(effectiveUser.id, i)) return false;
+              const uState = this.db.getOrCreateUserItemState(effectiveUser.id, i.id);
               itemStates[i.id] = uState;
               if (i.current_revision_id && st.item_revisions[i.current_revision_id]) {
                 const r = st.item_revisions[i.current_revision_id];
                 revisionsByItemId[i.id] = { sanitized_html: r.sanitized_html, toc: r.toc };
               }
               annotationsByItemId[i.id] = Object.values(st.annotations).filter(
-                (a) => a.item_id === i.id && a.user_id === effectiveUser!.id
+                (a) => a.item_id === i.id && a.user_id === effectiveUser.id
               );
               return uState.lifecycle !== 'trashed';
             })
@@ -490,7 +449,7 @@ self.addEventListener('fetch', (e) => {
       const activeItem = activeId ? this.db.read((st) => st.items[activeId]) : undefined;
       const rev =
         activeItem?.current_revision_id
-          ? this.db.read((st) => st.item_revisions[activeItem.current_revision_id!])
+          ? this.db.read((st) => st.item_revisions[activeItem.current_revision_id])
           : undefined;
       const annotations =
         activeItem && effectiveUser
@@ -536,7 +495,7 @@ self.addEventListener('fetch', (e) => {
       }
 
       const now = new Date().toISOString();
-      const adminUser: User = {
+      const adminUser = {
         id: uuidv7(),
         username,
         email,
@@ -605,7 +564,7 @@ self.addEventListener('fetch', (e) => {
             return json(403, { error: 'Valid invitation code required', code: 'INVITE_REQUIRED' });
           }
           const now = new Date().toISOString();
-          const newUser: User = {
+          const newUser = {
             id: uuidv7(),
             username,
             email,
@@ -632,7 +591,7 @@ self.addEventListener('fetch', (e) => {
         }
 
         const now = new Date().toISOString();
-        const newUser: User = {
+        const newUser = {
           id: uuidv7(),
           username,
           email,
@@ -727,7 +686,7 @@ self.addEventListener('fetch', (e) => {
     }
 
     if (route.method === 'POST' && route.path === '/api/auth/sessions/revoke') {
-      const userId = actor.user!.id;
+      const userId = actor.user.id;
       const revokedCount = this.db.transaction((st) => {
         let count = 0;
         const now = new Date().toISOString();
@@ -743,7 +702,7 @@ self.addEventListener('fetch', (e) => {
     }
 
     if (route.method === 'GET' && route.path === '/api/auth/me') {
-      const u = actor.user!;
+      const u = actor.user;
       return json(200, {
         id: u.id,
         username: u.username,
@@ -754,11 +713,11 @@ self.addEventListener('fetch', (e) => {
     }
 
     if (route.method === 'PATCH' && route.path === '/api/user/settings') {
-      const userId = actor.user!.id;
+      const userId = actor.user.id;
       const updatedSettings = this.db.transaction((st) => {
         const u = st.users[userId];
-        if (typeof body.theme === 'string' && (THEMES[body.theme as ThemeId] || body.theme === 'system')) {
-          u.settings.theme = body.theme as User['settings']['theme'];
+        if (typeof body.theme === 'string' && (THEMES[body.theme] || body.theme === 'system')) {
+          u.settings.theme = body.theme;
         }
         if (body.listLayout === 'compact' || body.listLayout === 'comfortable') {
           u.settings.listLayout = body.listLayout;
@@ -767,7 +726,7 @@ self.addEventListener('fetch', (e) => {
           u.settings.offlineStorageCapMb = Math.max(10, Math.min(2000, body.offlineStorageCapMb));
         }
         if (body.reader && typeof body.reader === 'object') {
-          const r = body.reader as Record<string, unknown>;
+          const r = body.reader;
           if (r.width === 'narrow' || r.width === 'medium' || r.width === 'wide') u.settings.reader.width = r.width;
           if (typeof r.fontSize === 'number') u.settings.reader.fontSize = Math.max(12, Math.min(28, r.fontSize));
           if (r.fontFamily === 'serif' || r.fontFamily === 'sans') u.settings.reader.fontFamily = r.fontFamily;
@@ -791,14 +750,14 @@ self.addEventListener('fetch', (e) => {
           id: invId,
           code_hash: sha256Hex(rawCode),
           email,
-          created_by: actor.user!.id,
+          created_by: actor.user.id,
           used_by: null,
           expires_at: new Date(Date.now() + 7 * 24 * 3600_000).toISOString(),
           created_at: now,
         };
         st.audit_events.push({
           id: uuidv7(),
-          actor_id: actor.user!.id,
+          actor_id: actor.user.id,
           action: 'admin.invitation_created',
           resource_type: 'invitation',
           resource_id: invId,
@@ -828,7 +787,7 @@ self.addEventListener('fetch', (e) => {
         }
         st.audit_events.push({
           id: uuidv7(),
-          actor_id: actor.user!.id,
+          actor_id: actor.user.id,
           action: 'admin.password_reset',
           resource_type: 'user',
           resource_id: targetUserId,
@@ -841,14 +800,14 @@ self.addEventListener('fetch', (e) => {
 
     if (route.method === 'GET' && route.path === '/api/admin/diagnostics') {
       return this.db.read((st) => {
-        const queueDepth: Record<string, number> = {
+        const queueDepth = {
           queued: 0,
           running: 0,
           completed: 0,
           failed: 0,
           dead_letter: 0,
         };
-        const durations: number[] = [];
+        const durations = [];
         for (const j of Object.values(st.jobs)) {
           queueDepth[j.status] = (queueDepth[j.status] || 0) + 1;
           if (typeof j.duration_ms === 'number') durations.push(j.duration_ms);
@@ -910,7 +869,7 @@ self.addEventListener('fetch', (e) => {
       this.db.transaction((st) => {
         st.pairing_tokens[id] = {
           id,
-          user_id: actor.user!.id,
+          user_id: actor.user.id,
           name,
           pairing_code_hash: sha256Hex(rawPairingCode),
           pairing_expires_at: new Date(Date.now() + 10 * 60_000).toISOString(),
@@ -949,7 +908,7 @@ self.addEventListener('fetch', (e) => {
     if (route.method === 'POST' && route.path === '/api/extension/tokens/:id/revoke') {
       return this.db.transaction((st) => {
         const pt = st.pairing_tokens[params.id];
-        if (!pt || pt.user_id !== actor.user!.id) {
+        if (!pt || pt.user_id !== actor.user.id) {
           return json(404, { error: 'Token not found' });
         }
         pt.revoked_at = new Date().toISOString();
@@ -977,7 +936,7 @@ self.addEventListener('fetch', (e) => {
         throw err;
       }
 
-      const ownerId = actor.user!.id;
+      const ownerId = actor.user.id;
       const outcome = this.db.transaction((st) => {
         // Check duplicate (owner_id, normalized_url)
         const existing = Object.values(st.items).find(
@@ -988,7 +947,7 @@ self.addEventListener('fetch', (e) => {
         }
 
         const now = new Date().toISOString();
-        const item: Item = {
+        const item = {
           id: uuidv7(),
           owner_id: ownerId,
           url: norm.originalUrl,
@@ -1035,7 +994,7 @@ self.addEventListener('fetch', (e) => {
 
     // 7. Library Views, Sorting, Filtering, Cursor Pagination, and Bulk Actions
     if (route.method === 'GET' && route.path === '/api/items') {
-      const userId = actor.user!.id;
+      const userId = actor.user.id;
       const view = query.get('view') || 'all'; // inbox, all, unread, favorites, archived, failed, trashed
       const tagFilter = query.get('tag')?.toLowerCase();
       const colFilter = query.get('collection');
@@ -1049,7 +1008,7 @@ self.addEventListener('fetch', (e) => {
       const cursor = query.get('cursor');
 
       return this.db.read((st) => {
-        const rows: Array<{ item: Item; state: ReturnType<ContainedDatabase['getOrCreateUserItemState']>; tags: string[] }> = [];
+        const rows = [];
         const accessibleIds = this.db.getAccessibleItemIdsForUser(userId);
 
         for (const itemId of accessibleIds) {
@@ -1107,7 +1066,7 @@ self.addEventListener('fetch', (e) => {
     }
 
     if (route.method === 'POST' && route.path === '/api/items/bulk') {
-      const userId = actor.user!.id;
+      const userId = actor.user.id;
       const itemIds = Array.isArray(body.itemIds) ? body.itemIds.map(String) : [];
       const action = String(body.action || ''); // mark_read, mark_unread, favorite, archive, add_tag, add_to_collection
 
@@ -1149,9 +1108,9 @@ self.addEventListener('fetch', (e) => {
     }
 
     if (route.method === 'GET' && route.path === '/api/items/:id') {
-      const userId = actor.user!.id;
+      const userId = actor.user.id;
       return this.db.read((st) => {
-        const item = st.items[params.id]!;
+        const item = st.items[params.id];
         const state = this.db.getOrCreateUserItemState(userId, item.id);
         const revision = item.current_revision_id ? st.item_revisions[item.current_revision_id] || null : null;
         const tags = this.db.getItemTagNames(item.id);
@@ -1164,7 +1123,7 @@ self.addEventListener('fetch', (e) => {
 
     if (route.method === 'PATCH' && route.path === '/api/items/:id') {
       return this.db.transaction((st) => {
-        const item = st.items[params.id]!;
+        const item = st.items[params.id];
         if (typeof body.title === 'string' && body.title.trim()) item.title = body.title.trim();
         if (typeof body.author === 'string') item.author = body.author.trim() || null;
         if (typeof body.description === 'string') item.description = body.description.trim() || null;
@@ -1176,7 +1135,7 @@ self.addEventListener('fetch', (e) => {
     }
 
     if (route.method === 'POST' && route.path === '/api/items/:id/state') {
-      const userId = actor.user!.id;
+      const userId = actor.user.id;
       return this.db.transaction((st) => {
         const uState = this.db.getOrCreateUserItemState(userId, params.id);
         const now = new Date().toISOString();
@@ -1210,7 +1169,7 @@ self.addEventListener('fetch', (e) => {
 
     if (route.method === 'POST' && (route.path === '/api/items/:id/retry' || route.path === '/api/items/:id/reprocess')) {
       return this.db.transaction((st) => {
-        const item = st.items[params.id]!;
+        const item = st.items[params.id];
         item.processing_status = 'queued';
         item.error_message = null;
         item.error_class = null;
@@ -1225,7 +1184,7 @@ self.addEventListener('fetch', (e) => {
     }
 
     if (route.method === 'POST' && route.path === '/api/items/:id/restore') {
-      const userId = actor.user!.id;
+      const userId = actor.user.id;
       return this.db.transaction((st) => {
         const uState = this.db.getOrCreateUserItemState(userId, params.id);
         uState.lifecycle = 'active';
@@ -1240,10 +1199,10 @@ self.addEventListener('fetch', (e) => {
     if (route.method === 'DELETE' && route.path === '/api/items/:id') {
       const permanent = query.get('permanent') === 'true' || body.permanent === true;
       if (permanent) {
-        this.db.permanentlyDeleteItem(params.id, actor.user!.id);
+        this.db.permanentlyDeleteItem(params.id, actor.user.id);
         return json(200, { ok: true, deleted: 'permanent' });
       }
-      const userId = actor.user!.id;
+      const userId = actor.user.id;
       return this.db.transaction((st) => {
         const uState = this.db.getOrCreateUserItemState(userId, params.id);
         uState.lifecycle = 'trashed';
@@ -1263,14 +1222,14 @@ self.addEventListener('fetch', (e) => {
       const buf = Buffer.from(base64Data, 'base64');
 
       const lowerName = filename.toLowerCase();
-      const ownerId = actor.user!.id;
+      const ownerId = actor.user.id;
       const now = new Date().toISOString();
 
       if (lowerName.endsWith('.pdf')) {
         const parsedPdf = parsePdfBuffer(buf, filename);
         const blobId = this.db.blobs.put(buf);
         const itemId = uuidv7();
-        const item: Item = {
+        const item = {
           id: itemId,
           owner_id: ownerId,
           url: `file:///documents/${itemId}/${encodeURIComponent(filename)}`,
@@ -1320,7 +1279,7 @@ self.addEventListener('fetch', (e) => {
         const parsedEpub = parseEpubBuffer(buf);
         const blobId = this.db.blobs.put(buf);
         const itemId = uuidv7();
-        const item: Item = {
+        const item = {
           id: itemId,
           owner_id: ownerId,
           url: `file:///documents/${itemId}/${encodeURIComponent(filename)}`,
@@ -1370,7 +1329,7 @@ self.addEventListener('fetch', (e) => {
     }
 
     if (route.method === 'GET' && route.path === '/api/documents/:id/download') {
-      const item = this.db.read((st) => st.items[params.id])!;
+      const item = this.db.read((st) => st.items[params.id]);
       if (!item.blob_id) {
         return json(404, { error: 'No binary blob associated with item' });
       }
@@ -1391,7 +1350,7 @@ self.addEventListener('fetch', (e) => {
 
     // 9. Tags
     if (route.method === 'GET' && route.path === '/api/tags') {
-      const userId = actor.user!.id;
+      const userId = actor.user.id;
       return this.db.read((st) => {
         const tags = Object.values(st.tags).filter((t) => t.owner_id === userId);
         return json(200, { tags });
@@ -1401,7 +1360,7 @@ self.addEventListener('fetch', (e) => {
     if (route.method === 'POST' && route.path === '/api/tags') {
       const name = String(body.name || '').trim();
       if (!name) return json(400, { error: 'Tag name required' });
-      const userId = actor.user!.id;
+      const userId = actor.user.id;
       const collectionId = body.collectionId ? String(body.collectionId) : null;
       const normName = name.toLowerCase();
 
@@ -1424,13 +1383,13 @@ self.addEventListener('fetch', (e) => {
     }
 
     if (route.method === 'POST' && route.path === '/api/items/:id/tags') {
-      const userId = actor.user!.id;
+      const userId = actor.user.id;
       const name = String(body.name || '').trim();
       if (!name) return json(400, { error: 'Tag name required' });
       const normName = name.toLowerCase();
 
       return this.db.transaction((st) => {
-        const item = st.items[params.id]!;
+        const item = st.items[params.id];
         let tag = Object.values(st.tags).find(
           (t) => t.owner_id === userId && !t.collection_id && t.normalized_name === normName
         );
@@ -1452,7 +1411,7 @@ self.addEventListener('fetch', (e) => {
 
     if (route.method === 'DELETE' && route.path === '/api/items/:id/tags/:tagId') {
       return this.db.transaction((st) => {
-        const item = st.items[params.id]!;
+        const item = st.items[params.id];
         delete st.item_tags[`${item.id}:${params.tagId}`];
         this.db.indexSingleItem(item);
         return json(200, { ok: true });
@@ -1461,7 +1420,7 @@ self.addEventListener('fetch', (e) => {
 
     // 10. Collections (Flat, Nested, and Shared)
     if (route.method === 'GET' && route.path === '/api/collections') {
-      const userId = actor.user!.id;
+      const userId = actor.user.id;
       return this.db.read((st) => {
         const collections = Object.values(st.collections).filter(
           (c) => c.owner_id === userId || Boolean(st.collection_members[`${c.id}:${userId}`])
@@ -1475,9 +1434,9 @@ self.addEventListener('fetch', (e) => {
       if (!name) return json(400, { error: 'Collection name required' });
       const parentId = body.parentId ? String(body.parentId) : null;
       const now = new Date().toISOString();
-      const col: Collection = {
+      const col = {
         id: uuidv7(),
-        owner_id: actor.user!.id,
+        owner_id: actor.user.id,
         parent_id: parentId,
         name,
         description: body.description ? String(body.description) : null,
@@ -1496,7 +1455,7 @@ self.addEventListener('fetch', (e) => {
 
     if (route.method === 'GET' && route.path === '/api/collections/:id') {
       return this.db.read((st) => {
-        const col = st.collections[params.id]!;
+        const col = st.collections[params.id];
         const items = Object.values(st.collection_items)
           .filter((ci) => ci.collection_id === col.id)
           .map((ci) => st.items[ci.item_id])
@@ -1508,7 +1467,7 @@ self.addEventListener('fetch', (e) => {
 
     if (route.method === 'PATCH' && route.path === '/api/collections/:id') {
       return this.db.transaction((st) => {
-        const col = st.collections[params.id]!;
+        const col = st.collections[params.id];
         if (body.parentId !== undefined) {
           const newParentId = body.parentId ? String(body.parentId) : null;
           if (newParentId) {
@@ -1516,7 +1475,7 @@ self.addEventListener('fetch', (e) => {
               return json(400, { error: 'Cannot move collection into itself', code: 'CYCLE_DETECTED' });
             }
             // Walk ancestors of newParentId to prevent moving a collection into its own descendant
-            let curr: string | null = newParentId;
+            let curr = newParentId;
             while (curr) {
               if (curr === col.id) {
                 return json(400, {
@@ -1540,7 +1499,7 @@ self.addEventListener('fetch', (e) => {
     if (route.method === 'DELETE' && route.path === '/api/collections/:id') {
       const mode = query.get('mode') || String(body.mode || ''); // 'promote' or 'recursive'
       return this.db.transaction((st) => {
-        const col = st.collections[params.id]!;
+        const col = st.collections[params.id];
         const children = Object.values(st.collections).filter((c) => c.parent_id === col.id);
         if (children.length > 0 && mode !== 'promote' && mode !== 'recursive') {
           return json(400, {
@@ -1549,7 +1508,7 @@ self.addEventListener('fetch', (e) => {
           });
         }
 
-        const deleteSingleCol = (cid: string) => {
+        const deleteSingleCol = (cid) => {
           delete st.collections[cid];
           for (const [k, ci] of Object.entries(st.collection_items)) {
             if (ci.collection_id === cid) delete st.collection_items[k];
@@ -1565,7 +1524,7 @@ self.addEventListener('fetch', (e) => {
           }
           deleteSingleCol(col.id);
         } else if (mode === 'recursive') {
-          const visit = (cid: string) => {
+          const visit = (cid) => {
             for (const ch of Object.values(st.collections).filter((c) => c.parent_id === cid)) {
               visit(ch.id);
             }
@@ -1581,7 +1540,7 @@ self.addEventListener('fetch', (e) => {
 
     if (route.method === 'POST' && route.path === '/api/collections/:id/items') {
       const itemId = String(body.itemId || '');
-      const userId = actor.user!.id;
+      const userId = actor.user.id;
       return this.db.transaction((st) => {
         const item = st.items[itemId];
         // Editors may add their OWN items to the collection (Section 6.6)
@@ -1610,7 +1569,7 @@ self.addEventListener('fetch', (e) => {
 
     if (route.method === 'POST' && route.path === '/api/collections/:id/members') {
       const targetUserId = String(body.userId || '');
-      const role = String(body.role || 'viewer') as CollectionRole;
+      const role = String(body.role || 'viewer');
       if (!['owner', 'editor', 'viewer'].includes(role)) {
         return json(400, { error: 'Invalid role' });
       }
@@ -1621,12 +1580,12 @@ self.addEventListener('fetch', (e) => {
           collection_id: params.id,
           user_id: targetUserId,
           role,
-          invited_by: actor.user!.id,
+          invited_by: actor.user.id,
           created_at: now,
         };
         st.audit_events.push({
           id: uuidv7(),
-          actor_id: actor.user!.id,
+          actor_id: actor.user.id,
           action: 'collection.member_invited',
           resource_type: 'collection',
           resource_id: params.id,
@@ -1638,14 +1597,14 @@ self.addEventListener('fetch', (e) => {
     }
 
     if (route.method === 'PATCH' && route.path === '/api/collections/:id/members/:userId') {
-      const role = String(body.role || 'viewer') as CollectionRole;
+      const role = String(body.role || 'viewer');
       return this.db.transaction((st) => {
         const mem = st.collection_members[`${params.id}:${params.userId}`];
         if (!mem) return json(404, { error: 'Member not found' });
         mem.role = role;
         st.audit_events.push({
           id: uuidv7(),
-          actor_id: actor.user!.id,
+          actor_id: actor.user.id,
           action: 'collection.role_changed',
           resource_type: 'collection',
           resource_id: params.id,
@@ -1661,7 +1620,7 @@ self.addEventListener('fetch', (e) => {
         delete st.collection_members[`${params.id}:${params.userId}`];
         st.audit_events.push({
           id: uuidv7(),
-          actor_id: actor.user!.id,
+          actor_id: actor.user.id,
           action: 'collection.member_revoked',
           resource_type: 'collection',
           resource_id: params.id,
@@ -1674,10 +1633,10 @@ self.addEventListener('fetch', (e) => {
 
     // 11. Annotations
     if (route.method === 'GET' && route.path === '/api/items/:id/annotations') {
-      const userId = actor.user!.id;
+      const userId = actor.user.id;
       return this.db.read((st) => {
         // User sees their own private annotations + annotations explicitly shared to collections they belong to
-        const userCols = new Set<string>();
+        const userCols = new Set();
         for (const col of Object.values(st.collections)) {
           if (col.owner_id === userId || st.collection_members[`${col.id}:${userId}`]) {
             userCols.add(col.id);
@@ -1693,9 +1652,9 @@ self.addEventListener('fetch', (e) => {
     }
 
     if (route.method === 'POST' && route.path === '/api/items/:id/annotations') {
-      const userId = actor.user!.id;
+      const userId = actor.user.id;
       return this.db.transaction((st) => {
-        const item = st.items[params.id]!;
+        const item = st.items[params.id];
         const rev = item.current_revision_id ? st.item_revisions[item.current_revision_id] : null;
         const plain = rev ? rev.plain_text : '';
 
@@ -1713,7 +1672,7 @@ self.addEventListener('fetch', (e) => {
             : buildTextAnchor(plain, startOffset, endOffset);
 
         const now = new Date().toISOString();
-        const ann: Annotation = {
+        const ann = {
           id: uuidv7(),
           item_id: item.id,
           user_id: userId,
@@ -1742,7 +1701,7 @@ self.addEventListener('fetch', (e) => {
 
     if (route.method === 'PATCH' && route.path === '/api/annotations/:id') {
       return this.db.transaction((st) => {
-        const ann = st.annotations[params.id]!;
+        const ann = st.annotations[params.id];
         if (typeof body.note === 'string') ann.note = body.note;
         if (typeof body.color === 'string') ann.color = body.color;
         if (Array.isArray(body.sharedInCollections)) {
@@ -1758,7 +1717,7 @@ self.addEventListener('fetch', (e) => {
 
     if (route.method === 'DELETE' && route.path === '/api/annotations/:id') {
       return this.db.transaction((st) => {
-        const ann = st.annotations[params.id]!;
+        const ann = st.annotations[params.id];
         const item = st.items[ann.item_id];
         delete st.annotations[params.id];
         if (item) this.db.indexSingleItem(item);
@@ -1767,7 +1726,7 @@ self.addEventListener('fetch', (e) => {
     }
 
     if (route.method === 'GET' && route.path === '/api/annotations/export') {
-      const userId = actor.user!.id;
+      const userId = actor.user.id;
       return this.db.read((st) => {
         const annotations = Object.values(st.annotations)
           .filter((a) => a.user_id === userId)
@@ -1790,7 +1749,7 @@ self.addEventListener('fetch', (e) => {
       const limit = Number(query.get('limit') || 20);
       const mode = query.get('mode') === 'hybrid' ? 'hybrid' : 'lexical';
 
-      const res = this.db.searchItems(actor.user!.id, q, { limit, cursor, mode });
+      const res = this.db.searchItems(actor.user.id, q, { limit, cursor, mode });
       this.searchLatenciesMs.push(res.explain.executionTimeMs);
       if (!res.ok) {
         return json(400, { ok: false, errors: res.errors });
@@ -1807,7 +1766,7 @@ self.addEventListener('fetch', (e) => {
 
     // 13. Feeds (RSS/Atom)
     if (route.method === 'GET' && route.path === '/api/feeds') {
-      const userId = actor.user!.id;
+      const userId = actor.user.id;
       return this.db.read((st) => {
         const feeds = Object.values(st.feeds).filter((f) => f.owner_id === userId);
         return json(200, { feeds });
@@ -1818,7 +1777,7 @@ self.addEventListener('fetch', (e) => {
       const rawUrl = String(body.url || '').trim();
       const norm = parseAndNormalizeUrl(rawUrl);
       const pollInterval = Math.max(5, Number(body.pollIntervalMinutes || 30)); // minimum floor of 5 minutes
-      const userId = actor.user!.id;
+      const userId = actor.user.id;
 
       return this.db.transaction((st) => {
         const existing = Object.values(st.feeds).find(
@@ -1878,7 +1837,7 @@ self.addEventListener('fetch', (e) => {
 
     if (route.method === 'PATCH' && route.path === '/api/feeds/:id') {
       return this.db.transaction((st) => {
-        const feed = st.feeds[params.id]!;
+        const feed = st.feeds[params.id];
         if (typeof body.pollIntervalMinutes === 'number') {
           feed.poll_interval_minutes = Math.max(5, body.pollIntervalMinutes);
         }
@@ -1910,7 +1869,7 @@ self.addEventListener('fetch', (e) => {
     }
 
     if (route.method === 'POST' && route.path === '/api/feeds/:id/entries/:entryId/save') {
-      const userId = actor.user!.id;
+      const userId = actor.user.id;
       return this.db.transaction((st) => {
         const entry = st.feed_entries[params.entryId];
         if (!entry || entry.feed_id !== params.id) return json(404, { error: 'Feed entry not found' });
@@ -1918,7 +1877,7 @@ self.addEventListener('fetch', (e) => {
         const norm = parseAndNormalizeUrl(entry.url);
         const now = new Date().toISOString();
         const itemId = uuidv7();
-        const item: Item = {
+        const item = {
           id: itemId,
           owner_id: userId,
           url: entry.url,
@@ -1966,13 +1925,13 @@ self.addEventListener('fetch', (e) => {
 
     // 14. Offline Sync
     if (route.method === 'POST' && route.path === '/api/sync') {
-      const mutations = (Array.isArray(body.mutations) ? body.mutations : []) as ClientMutation[];
-      const results = this.db.applySyncMutations(actor.user!.id, mutations);
+      const mutations = (Array.isArray(body.mutations) ? body.mutations : []);
+      const results = this.db.applySyncMutations(actor.user.id, mutations);
       return json(200, { results });
     }
 
     if (route.method === 'GET' && route.path === '/api/sync/conflicts') {
-      const userId = actor.user!.id;
+      const userId = actor.user.id;
       return this.db.read((st) => {
         const conflicts = Object.values(st.sync_conflicts).filter((c) => c.user_id === userId);
         return json(200, { conflicts });
@@ -1981,14 +1940,14 @@ self.addEventListener('fetch', (e) => {
 
     // 15. Knowledge Graph & Explainable Recommendations (Section 8.9)
     if (route.method === 'GET' && route.path === '/api/graph') {
-      const userId = actor.user!.id;
+      const userId = actor.user.id;
       const rootItemId = query.get('itemId');
       const depth = Math.max(1, Math.min(3, Number(query.get('depth') || 1)));
       const maxNodes = Math.max(5, Math.min(200, Number(query.get('maxNodes') || 50)));
 
       return this.db.read((st) => {
         const allUserEdges = Object.values(st.graph_edges).filter((e) => e.owner_id === userId);
-        const visitedNodes = new Set<string>();
+        const visitedNodes = new Set();
         const selectedEdges = [];
 
         if (rootItemId && st.items[rootItemId] && st.items[rootItemId].owner_id === userId) {
@@ -2035,7 +1994,7 @@ self.addEventListener('fetch', (e) => {
     if (route.method === 'POST' && route.path === '/api/graph/links') {
       const sourceId = String(body.sourceItemId || '');
       const targetId = String(body.targetItemId || '');
-      const userId = actor.user!.id;
+      const userId = actor.user.id;
       return this.db.transaction((st) => {
         const s = st.items[sourceId];
         const t = st.items[targetId];
@@ -2047,7 +2006,7 @@ self.addEventListener('fetch', (e) => {
           owner_id: userId,
           source_item_id: sourceId,
           target_item_id: targetId,
-          edge_type: 'explicit_link' as const,
+          edge_type: 'explicit_link',
           weight: 5,
           explanation: String(body.explanation || `Explicit link between "${s.title}" and "${t.title}"`),
           created_at: new Date().toISOString(),
@@ -2058,14 +2017,14 @@ self.addEventListener('fetch', (e) => {
     }
 
     if (route.method === 'GET' && route.path === '/api/items/:id/recommendations') {
-      const userId = actor.user!.id;
+      const userId = actor.user.id;
       return this.db.read((st) => {
         const edges = Object.values(st.graph_edges).filter(
           (e) =>
             e.owner_id === userId &&
             (e.source_item_id === params.id || e.target_item_id === params.id)
         );
-        const byOther = new Map<string, { score: number; reasons: string[] }>();
+        const byOther = new Map();
         for (const e of edges) {
           const otherId = e.source_item_id === params.id ? e.target_item_id : e.source_item_id;
           const item = st.items[otherId];
@@ -2090,16 +2049,14 @@ self.addEventListener('fetch', (e) => {
 
     // 16. Export & Import (Section 8.10)
     if (route.method === 'POST' && route.path === '/api/export') {
-      const format = (body.format === 'csv' || body.format === 'opml' ? body.format : 'json') as
-        | 'json'
-        | 'csv'
-        | 'opml';
+      const format = (body.format === 'csv' || body.format === 'opml' ? body.format : 'json')
+        ;
       const exportId = uuidv7();
       const rawToken = crypto.randomBytes(24).toString('base64url');
       const job = this.db.transaction(() =>
         this.db.enqueueJob(
           'export.generate',
-          { exportId, userId: actor.user!.id, format, rawToken },
+          { exportId, userId: actor.user.id, format, rawToken },
           { idempotencyKey: `export:${exportId}` }
         )
       );
@@ -2113,7 +2070,7 @@ self.addEventListener('fetch', (e) => {
 
     if (route.method === 'GET' && route.path === '/api/export/:id/download') {
       const token = query.get('token') || '';
-      const artifact = this.db.read((st) => st.export_artifacts[params.id])!;
+      const artifact = this.db.read((st) => st.export_artifacts[params.id]);
       if (!token || sha256Hex(token) !== artifact.download_token_hash) {
         return json(403, { error: 'Invalid download token', code: 'INVALID_EXPORT_TOKEN' });
       }
@@ -2143,7 +2100,7 @@ self.addEventListener('fetch', (e) => {
       const format = String(body.format || 'json').toLowerCase(); // json, csv, bookmarks_html, pocket_html, opml, txt
       const dryRun = body.dryRun === true;
       const rawContent = typeof body.content === 'string' ? body.content : JSON.stringify(body.data || body);
-      const userId = actor.user!.id;
+      const userId = actor.user.id;
 
       let imported = 0;
       let updated = 0;
@@ -2151,12 +2108,12 @@ self.addEventListener('fetch', (e) => {
       let skipped = 0;
       let failed = 0;
 
-      const candidateUrls: Array<{ url: string; title?: string; tags?: string[] }> = [];
+      const candidateUrls = [];
 
       if (format === 'json') {
-        let parsed: Record<string, unknown>;
+        let parsed;
         try {
-          parsed = typeof body.data === 'object' && body.data ? (body.data as Record<string, unknown>) : JSON.parse(rawContent);
+          parsed = typeof body.data === 'object' && body.data ? (body.data) : JSON.parse(rawContent);
         } catch {
           return json(400, { error: 'Invalid JSON import payload' });
         }
@@ -2169,7 +2126,7 @@ self.addEventListener('fetch', (e) => {
             failed++;
             continue;
           }
-          const r = rawIt as Record<string, unknown>;
+          const r = rawIt;
           candidateUrls.push({
             url: String(r.url || ''),
             title: r.title ? String(r.title) : undefined,
@@ -2214,7 +2171,7 @@ self.addEventListener('fetch', (e) => {
           imported++;
           if (!dryRun) {
             const now = new Date().toISOString();
-            const item: Item = {
+            const item = {
               id: uuidv7(),
               owner_id: userId,
               url: norm.originalUrl,

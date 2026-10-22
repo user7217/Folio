@@ -1,79 +1,16 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { escapeHtml } from '../../article-processing/src/index.ts';
-import { reanchorHighlight } from '../../shared/src/anchoring.ts';
-import type {
-  Annotation,
-  AuditEvent,
-  ClientMutation,
-  Collection,
-  CollectionItem,
-  CollectionMember,
-  CollectionRole,
-  DocumentChunkEmbedding,
-  ExportArtifact,
-  Feed,
-  FeedEntry,
-  GraphEdge,
-  Invitation,
-  Item,
-  ItemRevision,
-  ItemTag,
-  Job,
-  JobType,
-  PairingToken,
-  Session,
-  SyncConflict,
-  SyncMutationRecord,
-  Tag,
-  User,
-  UserItemState,
-  WorkerHeartbeat,
-} from '../../shared/src/index.ts';
-import { uuidv7 } from '../../shared/src/index.ts';
-import type { SearchAstNode } from '../../shared/src/search-parser.ts';
-import { parseSearchQuery } from '../../shared/src/search-parser.ts';
-import { evaluateAnnotationMutation, mergeItemStateMutation } from '../../shared/src/sync.ts';
-import { parseAndNormalizeUrl } from '../../shared/src/url.ts';
+import { escapeHtml } from '../../article-processing/src/index.js';
+import { reanchorHighlight } from '../../shared/src/anchoring.js';
+import { uuidv7 } from '../../shared/src/index.js';
+import { parseSearchQuery } from '../../shared/src/search-parser.js';
+import { evaluateAnnotationMutation, mergeItemStateMutation } from '../../shared/src/sync.js';
+import { parseAndNormalizeUrl } from '../../shared/src/url.js';
 
 export const CURRENT_SCHEMA_VERSION = 3;
 
-export interface SchemaMigrationRecord {
-  version: number;
-  name: string;
-  applied_at: string;
-}
-
-export interface DatabaseState {
-  schema_version: number;
-  migrations: SchemaMigrationRecord[];
-  users: Record<string, User>;
-  sessions: Record<string, Session>;
-  invitations: Record<string, Invitation>;
-  pairing_tokens: Record<string, PairingToken>;
-  items: Record<string, Item>;
-  user_item_states: Record<string, UserItemState>;
-  item_revisions: Record<string, ItemRevision>;
-  tags: Record<string, Tag>;
-  item_tags: Record<string, ItemTag>;
-  collections: Record<string, Collection>;
-  collection_items: Record<string, CollectionItem>;
-  collection_members: Record<string, CollectionMember>;
-  annotations: Record<string, Annotation>;
-  feeds: Record<string, Feed>;
-  feed_entries: Record<string, FeedEntry>;
-  jobs: Record<string, Job>;
-  sync_mutations: Record<string, SyncMutationRecord>;
-  sync_conflicts: Record<string, SyncConflict>;
-  graph_edges: Record<string, GraphEdge>;
-  embeddings: Record<string, DocumentChunkEmbedding>;
-  audit_events: AuditEvent[];
-  export_artifacts: Record<string, ExportArtifact>;
-  worker_heartbeats: Record<string, WorkerHeartbeat>;
-}
-
-export function createEmptyDatabaseState(schemaVersion: number = CURRENT_SCHEMA_VERSION): DatabaseState {
+export function createEmptyDatabaseState(schemaVersion = CURRENT_SCHEMA_VERSION) {
   return {
     schema_version: schemaVersion,
     migrations: [],
@@ -103,16 +40,20 @@ export function createEmptyDatabaseState(schemaVersion: number = CURRENT_SCHEMA_
   };
 }
 
-export function hashPassword(password: string): string {
+export function hashPassword(password) {
+  if (typeof password !== 'string' || password.length === 0 || password.length > 256) {
+    throw new Error('Password must be between 1 and 256 characters');
+  }
   const salt = crypto.randomBytes(16);
   const derived = crypto.scryptSync(password, salt, 32, { N: 16384, r: 8, p: 1 });
   return `$argon2id$v=19$m=16384,t=2,p=1$${salt.toString('base64url')}$${derived.toString('base64url')}`;
 }
 
-export function verifyPassword(password: string, storedHash: string): boolean {
+export function verifyPassword(password, storedHash) {
   try {
+    if (typeof password !== 'string' || password.length === 0 || password.length > 256) return false;
     const parts = storedHash.split('$');
-    if (parts.length !== 6 || parts[1] !== 'argon2id') return false;
+    if (parts.length !== 6 || (parts[1] !== 'argon2id' && parts[1] !== 'scrypt')) return false;
     const salt = Buffer.from(parts[4], 'base64url');
     const expected = Buffer.from(parts[5], 'base64url');
     const actual = crypto.scryptSync(password, salt, expected.length, { N: 16384, r: 8, p: 1 });
@@ -123,11 +64,11 @@ export function verifyPassword(password: string, storedHash: string): boolean {
   }
 }
 
-export function sha256Hex(value: string): string {
+export function sha256Hex(value) {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
 
-function stemWord(word: string): string {
+function stemWord(word) {
   const w = word.toLowerCase();
   if (w.length <= 3) return w;
   if (w.endsWith('ies') && w.length > 4) return `${w.slice(0, -3)}y`;
@@ -138,7 +79,7 @@ function stemWord(word: string): string {
   return w;
 }
 
-export function tokenizeTextForIndex(text: string): string[] {
+export function tokenizeTextForIndex(text) {
   if (!text) return [];
   return text
     .toLowerCase()
@@ -147,7 +88,7 @@ export function tokenizeTextForIndex(text: string): string[] {
     .map(stemWord);
 }
 
-export function computeDeterministicEmbedding(text: string, dims: number = 32): number[] {
+export function computeDeterministicEmbedding(text, dims = 32) {
   const vec = new Float64Array(dims);
   const tokens = tokenizeTextForIndex(text);
   if (tokens.length === 0) return Array.from(vec);
@@ -164,7 +105,7 @@ export function computeDeterministicEmbedding(text: string, dims: number = 32): 
   return Array.from(vec, (v) => Number((v / norm).toFixed(6)));
 }
 
-export function cosineSimilarity(a: number[], b: number[]): number {
+export function cosineSimilarity(a, b) {
   const len = Math.min(a.length, b.length);
   if (len === 0) return 0;
   let dot = 0;
@@ -180,14 +121,14 @@ export function cosineSimilarity(a: number[], b: number[]): number {
 }
 
 export class FilesystemBlobStore {
-  public readonly blobDir: string;
+  blobDir;
 
-  constructor(blobDir: string) {
+  constructor(blobDir) {
     this.blobDir = path.resolve(blobDir);
     fs.mkdirSync(this.blobDir, { recursive: true });
   }
 
-  private resolveSafeBlobPath(blobId: string): string {
+  resolveSafeBlobPath(blobId) {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(blobId)) {
       throw new Error(`Invalid opaque blob ID: ${blobId}`);
     }
@@ -198,7 +139,7 @@ export class FilesystemBlobStore {
     return target;
   }
 
-  public put(data: Buffer): string {
+  put(data) {
     const id = uuidv7();
     const filePath = this.resolveSafeBlobPath(id);
     const tmpPath = `${filePath}.tmp.${process.pid}`;
@@ -207,7 +148,7 @@ export class FilesystemBlobStore {
     return id;
   }
 
-  public get(blobId: string): Buffer {
+  get(blobId) {
     const filePath = this.resolveSafeBlobPath(blobId);
     if (!fs.existsSync(filePath)) {
       throw new Error(`Blob not found: ${blobId}`);
@@ -215,7 +156,7 @@ export class FilesystemBlobStore {
     return fs.readFileSync(filePath);
   }
 
-  public exists(blobId: string): boolean {
+  exists(blobId) {
     try {
       return fs.existsSync(this.resolveSafeBlobPath(blobId));
     } catch {
@@ -223,7 +164,7 @@ export class FilesystemBlobStore {
     }
   }
 
-  public delete(blobId: string): void {
+  delete(blobId) {
     try {
       const filePath = this.resolveSafeBlobPath(blobId);
       if (fs.existsSync(filePath)) {
@@ -235,57 +176,28 @@ export class FilesystemBlobStore {
   }
 }
 
-interface SearchIndexEntry {
-  itemId: string;
-  ownerId: string;
-  tokenFreqs: Map<string, number>;
-  fullNormalizedText: string;
-  rawSearchableText: string;
-}
-
-export interface SearchHit {
-  item: Item;
-  state: UserItemState;
-  score: number;
-  snippetHtml: string;
-  tags: string[];
-  collections: string[];
-}
-
-export interface QueryExplainPlan {
-  queryType: string;
-  indexUsed: boolean;
-  indexName: string;
-  scannedRows: number;
-  matchedRows: number;
-  sharedHitBlocks: number;
-  executionTimeMs: number;
-  planText: string;
-}
-
 /**
  * Transactional, multi-process-safe JSON + WAL Database Engine with O(1) Adjacency Maps
  * and Inverted GIN-style Search Index.
  */
 export class ContainedDatabase {
-  public readonly dataDir: string;
-  public readonly dbFilePath: string;
-  public readonly walFilePath: string;
-  public readonly lockDirPath: string;
-  public readonly blobs: FilesystemBlobStore;
+  dataDir;
+  dbFilePath;
+  walFilePath;
+  lockDirPath;
+  blobs;
 
-  private state: DatabaseState;
-  private lastLoadedMtimeMs: number = 0;
-  private invertedIndex: Map<string, Set<string>> = new Map();
-  private docIndex: Map<string, SearchIndexEntry> = new Map();
-  private ownerItemsIndex: Map<string, Set<string>> = new Map();
-  private itemTagNamesIndex: Map<string, string[]> = new Map();
-  private itemColNamesIndex: Map<string, string[]> = new Map();
-  private itemColIdsIndex: Map<string, Set<string>> = new Map();
-  private tagItemsByLowerNameIndex: Map<string, Set<string>> = new Map();
-  private useSecondaryIndexes: boolean = true;
+  lastLoadedMtimeMs = 0;
+  invertedIndex = new Map();
+  docIndex = new Map();
+  ownerItemsIndex = new Map();
+  itemTagNamesIndex = new Map();
+  itemColNamesIndex = new Map();
+  itemColIdsIndex = new Map();
+  tagItemsByLowerNameIndex = new Map();
+  useSecondaryIndexes = true;
 
-  constructor(dataDir?: string) {
+  constructor(dataDir) {
     const resolvedDir = path.resolve(
       dataDir || process.env.DATA_DIR || path.join(process.env.PROJECT_ROOT || process.cwd(), 'data')
     );
@@ -299,24 +211,24 @@ export class ContainedDatabase {
     this.loadFromDisk();
   }
 
-  public setUseSecondaryIndexes(enabled: boolean): void {
+  setUseSecondaryIndexes(enabled) {
     this.useSecondaryIndexes = enabled;
   }
 
-  public getItemTagNames(itemId: string): string[] {
+  getItemTagNames(itemId) {
     return this.itemTagNamesIndex.get(itemId) || [];
   }
 
-  public getItemCollectionNames(itemId: string): string[] {
+  getItemCollectionNames(itemId) {
     return this.itemColNamesIndex.get(itemId) || [];
   }
 
-  public getOwnerItemIds(ownerId: string): Set<string> {
+  getOwnerItemIds(ownerId) {
     return this.ownerItemsIndex.get(ownerId) || new Set();
   }
 
-  private acquireLock(timeoutMs: number = 5000): void {
-    const deadline = Date.now() + timeoutMs;
+  acquireLock(timeoutMs = 5000) {
+    let deadline = Date.now() + timeoutMs;
     while (true) {
       try {
         fs.mkdirSync(this.lockDirPath);
@@ -334,8 +246,8 @@ export class ContainedDatabase {
         }
         if (Date.now() > deadline) {
           fs.rmSync(this.lockDirPath, { recursive: true, force: true });
-          fs.mkdirSync(this.lockDirPath, { recursive: true });
-          return;
+          deadline = Date.now() + 1000;
+          continue;
         }
         const waitUntil = Date.now() + 2;
         while (Date.now() < waitUntil) {
@@ -345,15 +257,88 @@ export class ContainedDatabase {
     }
   }
 
-  private releaseLock(): void {
+  releaseLock() {
     try {
+      const pidFile = path.join(this.lockDirPath, 'pid');
+      if (fs.existsSync(pidFile)) {
+        const ownerPid = fs.readFileSync(pidFile, 'utf8').trim();
+        if (ownerPid && ownerPid !== String(process.pid)) {
+          return;
+        }
+      }
       fs.rmSync(this.lockDirPath, { recursive: true, force: true });
     } catch {
       // ignore
     }
   }
 
-  public loadFromDisk(): void {
+  runMigrationsOnState(st) {
+    const migrationsToRun = [
+      {
+        version: 1,
+        name: '0001_initial_core_schema',
+        up: (s) => {
+          s.users ||= {};
+          s.sessions ||= {};
+          s.invitations ||= {};
+          s.items ||= {};
+          s.user_item_states ||= {};
+          s.item_revisions ||= {};
+          s.tags ||= {};
+          s.item_tags ||= {};
+          s.collections ||= {};
+          s.collection_items ||= {};
+          s.annotations ||= {};
+          s.jobs ||= {};
+        },
+      },
+      {
+        version: 2,
+        name: '0002_feeds_documents_pairing_and_indexes',
+        up: (s) => {
+          s.pairing_tokens ||= {};
+          s.feeds ||= {};
+          s.feed_entries ||= {};
+          s.export_artifacts ||= {};
+          s.worker_heartbeats ||= {};
+          for (const item of Object.values(s.items)) {
+            item.outbound_urls ||= [];
+            item.ocr_status ||= 'none';
+            item.version ||= 1;
+          }
+        },
+      },
+      {
+        version: 3,
+        name: '0003_sharing_offline_sync_and_knowledge_graph',
+        up: (s) => {
+          s.collection_members ||= {};
+          s.sync_mutations ||= {};
+          s.sync_conflicts ||= {};
+          s.graph_edges ||= {};
+          s.embeddings ||= {};
+          s.audit_events ||= [];
+          for (const ann of Object.values(s.annotations)) {
+            ann.shared_in_collections ||= [];
+            ann.version ||= 1;
+          }
+        },
+      },
+    ];
+    for (const mig of migrationsToRun) {
+      if (st.schema_version < mig.version) {
+        mig.up(st);
+        st.schema_version = mig.version;
+        st.migrations.push({
+          version: mig.version,
+          name: mig.name,
+          applied_at: new Date().toISOString(),
+        });
+      }
+    }
+  }
+
+  loadFromDisk() {
     if (!fs.existsSync(this.dbFilePath)) {
       this.state = createEmptyDatabaseState(CURRENT_SCHEMA_VERSION);
       this.rebuildIndexes();
@@ -365,8 +350,12 @@ export class ContainedDatabase {
         return;
       }
       const raw = fs.readFileSync(this.dbFilePath, 'utf8');
-      const parsed = JSON.parse(raw) as DatabaseState;
-      this.state = { ...createEmptyDatabaseState(CURRENT_SCHEMA_VERSION), ...parsed, schema_version: CURRENT_SCHEMA_VERSION };
+      const parsed = JSON.parse(raw);
+      const diskVer = typeof parsed.schema_version === 'number' ? parsed.schema_version : 1;
+      this.state = { ...createEmptyDatabaseState(diskVer), ...parsed, schema_version: diskVer };
+      if (this.state.schema_version < CURRENT_SCHEMA_VERSION) {
+        this.runMigrationsOnState(this.state);
+      }
       this.lastLoadedMtimeMs = stat.mtimeMs;
       this.rebuildIndexes();
     } catch {
@@ -375,7 +364,7 @@ export class ContainedDatabase {
         if (lines.length > 0) {
           const lastEntry = JSON.parse(lines[lines.length - 1]);
           if (lastEntry && lastEntry.snapshot) {
-            this.state = lastEntry.snapshot as DatabaseState;
+            this.state = lastEntry.snapshot;
             this.persistSnapshotUnlocked();
             this.rebuildIndexes();
           }
@@ -384,7 +373,7 @@ export class ContainedDatabase {
     }
   }
 
-  private persistSnapshotUnlocked(): void {
+  persistSnapshotUnlocked() {
     const payload = JSON.stringify(this.state);
     const walEntry = JSON.stringify({
       ts: new Date().toISOString(),
@@ -404,7 +393,7 @@ export class ContainedDatabase {
     }
   }
 
-  public transaction<T>(fn: (state: DatabaseState) => T): T {
+  transaction(fn) {
     this.acquireLock();
     try {
       this.loadFromDisk();
@@ -416,14 +405,14 @@ export class ContainedDatabase {
     }
   }
 
-  public read<T>(fn: (state: DatabaseState) => T): T {
+  read(fn) {
     this.loadFromDisk();
     return fn(this.state);
   }
 
-  public migrate(): SchemaMigrationRecord[] {
+  migrate() {
     return this.transaction((st) => {
-      const migrationsToRun: Array<{ version: number; name: string; up: (s: DatabaseState) => void }> = [
+      const migrationsToRun = [
         {
           version: 1,
           name: '0001_initial_core_schema',
@@ -496,7 +485,7 @@ export class ContainedDatabase {
    * Builds all secondary indexes and O(1) adjacency maps in a single O(N + T + C + A) pass
    * (eliminating the O(N * (T + C + A)) nested loop bottleneck).
    */
-  public rebuildIndexes(): void {
+  rebuildIndexes() {
     this.invertedIndex.clear();
     this.docIndex.clear();
     this.ownerItemsIndex.clear();
@@ -541,7 +530,7 @@ export class ContainedDatabase {
       idSet.add(ci.collection_id);
     }
 
-    const notesByItemId = new Map<string, string[]>();
+    const notesByItemId = new Map();
     for (const ann of Object.values(this.state.annotations)) {
       let arr = notesByItemId.get(ann.item_id);
       if (!arr) {
@@ -557,7 +546,7 @@ export class ContainedDatabase {
     }
   }
 
-  private indexItemWithPrebuiltMaps(item: Item, itemNotes: string[]): void {
+  indexItemWithPrebuiltMaps(item, itemNotes) {
     let ownerSet = this.ownerItemsIndex.get(item.owner_id);
     if (!ownerSet) {
       ownerSet = new Set();
@@ -584,7 +573,7 @@ export class ContainedDatabase {
       .join('\n');
 
     const tokens = tokenizeTextForIndex(rawText);
-    const freqs = new Map<string, number>();
+    const freqs = new Map();
     for (const tok of tokens) {
       freqs.set(tok, (freqs.get(tok) || 0) + 1);
       let posting = this.invertedIndex.get(tok);
@@ -604,7 +593,7 @@ export class ContainedDatabase {
     });
   }
 
-  public indexSingleItem(item: Item): void {
+  indexSingleItem(item) {
     // Refresh this item's tag/collection adjacency entries and re-index
     const oldEntry = this.docIndex.get(item.id);
     if (oldEntry) {
@@ -613,7 +602,7 @@ export class ContainedDatabase {
       }
     }
 
-    const tagNames: string[] = [];
+    const tagNames = [];
     for (const it of Object.values(this.state.item_tags)) {
       if (it.item_id === item.id) {
         const t = this.state.tags[it.tag_id];
@@ -630,8 +619,8 @@ export class ContainedDatabase {
     }
     this.itemTagNamesIndex.set(item.id, tagNames);
 
-    const colNames: string[] = [];
-    const colIds = new Set<string>();
+    const colNames = [];
+    const colIds = new Set();
     for (const ci of Object.values(this.state.collection_items)) {
       if (ci.item_id === item.id) {
         colIds.add(ci.collection_id);
@@ -642,7 +631,7 @@ export class ContainedDatabase {
     this.itemColNamesIndex.set(item.id, colNames);
     this.itemColIdsIndex.set(item.id, colIds);
 
-    const itemNotes: string[] = [];
+    const itemNotes = [];
     for (const ann of Object.values(this.state.annotations)) {
       if (ann.item_id === item.id) {
         if (ann.exact_quote) itemNotes.push(ann.exact_quote);
@@ -653,7 +642,7 @@ export class ContainedDatabase {
     this.indexItemWithPrebuiltMaps(item, itemNotes);
   }
 
-  public removeItemFromIndex(itemId: string, ownerId?: string): void {
+  removeItemFromIndex(itemId, ownerId) {
     const entry = this.docIndex.get(itemId);
     if (entry) {
       for (const tok of entry.tokenFreqs.keys()) {
@@ -669,7 +658,7 @@ export class ContainedDatabase {
     }
   }
 
-  public getOrCreateUserItemState(userId: string, itemId: string): UserItemState {
+  getOrCreateUserItemState(userId, itemId) {
     const key = `${userId}:${itemId}`;
     let st = this.state.user_item_states[key];
     if (!st) {
@@ -693,11 +682,11 @@ export class ContainedDatabase {
     return st;
   }
 
-  public getUserSharedCollectionRolesForItem(
-    userId: string,
-    itemId: string
-  ): CollectionRole[] {
-    const roles: CollectionRole[] = [];
+  getUserSharedCollectionRolesForItem(
+    userId,
+    itemId
+  ) {
+    const roles = [];
     const colIds = this.itemColIdsIndex.get(itemId);
     if (colIds) {
       for (const cid of colIds) {
@@ -729,13 +718,13 @@ export class ContainedDatabase {
     return roles;
   }
 
-  public canUserReadItem(userId: string, item: Item): boolean {
+  canUserReadItem(userId, item) {
     if (item.owner_id === userId) return true;
     return this.getUserSharedCollectionRolesForItem(userId, item.id).length > 0;
   }
 
-  public getAccessibleItemIdsForUser(userId: string): Set<string> {
-    const set = new Set<string>(this.ownerItemsIndex.get(userId) || []);
+  getAccessibleItemIdsForUser(userId) {
+    const set = new Set(this.ownerItemsIndex.get(userId) || []);
     for (const mem of Object.values(this.state.collection_members)) {
       if (mem.user_id === userId) {
         for (const ci of Object.values(this.state.collection_items)) {
@@ -748,23 +737,23 @@ export class ContainedDatabase {
     return set;
   }
 
-  public enqueueJob<T extends Record<string, unknown>>(
-    type: JobType,
-    payload: T,
-    options: { idempotencyKey?: string; maxAttempts?: number; timeoutMs?: number; runAfter?: string } = {}
-  ): Job<T> {
+  enqueueJob(
+    type,
+    payload,
+    options = {}
+  ) {
     const idempKey = options.idempotencyKey || `${type}:${JSON.stringify(payload)}`;
     for (const existing of Object.values(this.state.jobs)) {
       if (
         existing.idempotency_key === idempKey &&
         (existing.status === 'queued' || existing.status === 'running')
       ) {
-        return existing as Job<T>;
+        return existing;
       }
     }
 
     const now = new Date().toISOString();
-    const job: Job<T> = {
+    const job = {
       id: uuidv7(),
       type,
       payload,
@@ -786,7 +775,7 @@ export class ContainedDatabase {
     return job;
   }
 
-  public permanentlyDeleteItem(itemId: string, actorId: string): boolean {
+  permanentlyDeleteItem(itemId, actorId) {
     return this.transaction((st) => {
       const item = st.items[itemId];
       if (!item) return false;
@@ -836,11 +825,11 @@ export class ContainedDatabase {
     });
   }
 
-  public applyNewRevision(
-    itemId: string,
-    revInput: Omit<ItemRevision, 'id' | 'item_id' | 'revision_number' | 'created_at'>,
-    metadataUpdates: Partial<Item> = {}
-  ): ItemRevision {
+  applyNewRevision(
+    itemId,
+    revInput,
+    metadataUpdates = {}
+  ) {
     return this.transaction((st) => {
       const item = st.items[itemId];
       if (!item) throw new Error(`Item not found: ${itemId}`);
@@ -853,7 +842,7 @@ export class ContainedDatabase {
       }
 
       const now = new Date().toISOString();
-      const revision: ItemRevision = {
+      const revision = {
         id: uuidv7(),
         item_id: itemId,
         revision_number: maxRevNum + 1,
@@ -910,7 +899,7 @@ export class ContainedDatabase {
     });
   }
 
-  public recomputeGraphForOwner(ownerId: string): number {
+  recomputeGraphForOwner(ownerId) {
     return this.transaction((st) => {
       for (const [k, edge] of Object.entries(st.graph_edges)) {
         if (edge.owner_id === ownerId && edge.edge_type !== 'explicit_link') {
@@ -921,7 +910,7 @@ export class ContainedDatabase {
       const ownerItems = Object.values(st.items)
         .filter((i) => i.owner_id === ownerId)
         .slice(0, 250);
-      const urlToItem = new Map<string, Item>();
+      const urlToItem = new Map();
       for (const it of ownerItems) {
         urlToItem.set(it.normalized_url, it);
       }
@@ -1013,18 +1002,18 @@ export class ContainedDatabase {
    * Narrows candidate item IDs using the inverted GIN index and tag index across AST nodes
    * before evaluating full rows.
    */
-  private narrowCandidatesFromAst(node: SearchAstNode | null, baseAccessible: Set<string>): Set<string> {
+  narrowCandidatesFromAst(node, baseAccessible) {
     if (!node || !this.useSecondaryIndexes) return baseAccessible;
 
     if (node.kind === 'term' && !node.negated) {
       const qTokens = tokenizeTextForIndex(node.value);
       if (qTokens.length === 0) return baseAccessible;
-      let current: Set<string> | null = null;
+      let current = null;
       for (const qt of qTokens) {
         const posting = this.invertedIndex.get(qt);
         if (!posting) continue;
         if (current === null) {
-          current = new Set<string>();
+          current = new Set();
           for (const id of posting) {
             if (baseAccessible.has(id)) current.add(id);
           }
@@ -1040,7 +1029,7 @@ export class ContainedDatabase {
     if (node.kind === 'filter' && !node.negated && node.field === 'tag') {
       const tagSet = this.tagItemsByLowerNameIndex.get(node.value.toLowerCase());
       if (!tagSet) return new Set();
-      const out = new Set<string>();
+      const out = new Set();
       for (const id of tagSet) {
         if (baseAccessible.has(id)) out.add(id);
       }
@@ -1061,21 +1050,11 @@ export class ContainedDatabase {
     return baseAccessible;
   }
 
-  public searchItems(
-    userId: string,
-    rawQuery: string,
-    options: {
-      limit?: number;
-      cursor?: string;
-      mode?: 'lexical' | 'hybrid';
-    } = {}
-  ): {
-    ok: boolean;
-    hits: SearchHit[];
-    nextCursor: string | null;
-    errors: Array<{ position: number; token: string; message: string }>;
-    explain: QueryExplainPlan;
-  } {
+  searchItems(
+    userId,
+    rawQuery,
+    options = {}
+  ) {
     const startHr = performance.now();
     this.loadFromDisk();
 
@@ -1107,10 +1086,10 @@ export class ContainedDatabase {
       : 'seq_scan_items';
 
     let scannedRows = 0;
-    const matchedHits: SearchHit[] = [];
-    const positiveTerms: string[] = [];
+    const matchedHits = [];
+    const positiveTerms = [];
 
-    const collectPositiveTerms = (node: SearchAstNode | null): void => {
+    const collectPositiveTerms = (node) => {
       if (!node) return;
       if (node.kind === 'term' && !node.negated) positiveTerms.push(node.value);
       else if (node.kind === 'and') node.children.forEach(collectPositiveTerms);
@@ -1122,13 +1101,13 @@ export class ContainedDatabase {
     collectPositiveTerms(parsed.ast);
 
     const evaluateAst = (
-      node: SearchAstNode | null,
-      item: Item,
-      state: UserItemState,
-      idxEntry: SearchIndexEntry | undefined,
-      tagsLower: string[],
-      colsLower: string[]
-    ): { match: boolean; score: number } => {
+      node,
+      item,
+      state,
+      idxEntry,
+      tagsLower,
+      colsLower
+    ) => {
       if (!node) return { match: true, score: 1 };
 
       if (node.kind === 'and') {
@@ -1304,12 +1283,12 @@ export class ContainedDatabase {
     };
   }
 
-  public applySyncMutations(
-    userId: string,
-    mutations: ClientMutation[]
-  ): SyncMutationRecord[] {
+  applySyncMutations(
+    userId,
+    mutations
+  ) {
     return this.transaction((st) => {
-      const results: SyncMutationRecord[] = [];
+      const results = [];
       const now = new Date().toISOString();
 
       for (const mut of mutations) {
@@ -1320,9 +1299,9 @@ export class ContainedDatabase {
           continue;
         }
 
-        let status: SyncMutationRecord['status'] = 'rejected';
-        let reason: string | null = null;
-        let conflictId: string | null = null;
+        let status = 'rejected';
+        let reason = null;
+        let conflictId = null;
 
         if (mut.entity === 'item_state') {
           const item = st.items[mut.entity_id];
@@ -1379,6 +1358,23 @@ export class ContainedDatabase {
           }
         } else if (mut.entity === 'annotation') {
           const existingAnn = st.annotations[mut.entity_id] || null;
+          if (existingAnn && existingAnn.user_id !== userId) {
+            const record = {
+              mutation_id: mut.mutation_id,
+              user_id: userId,
+              entity: mut.entity,
+              entity_id: mut.entity_id,
+              base_version: mut.base_version,
+              op: mut.op,
+              status: 'rejected',
+              reason: 'unauthorized_annotation',
+              conflict_id: null,
+              processed_at: now,
+            };
+            st.sync_mutations[dedupKey] = record;
+            results.push(record);
+            continue;
+          }
           const evalRes = evaluateAnnotationMutation(existingAnn, mut);
           status = evalRes.status;
           reason = evalRes.reason;
@@ -1390,7 +1386,7 @@ export class ContainedDatabase {
               status = 'rejected';
               reason = 'item_not_found';
             } else {
-              const ann: Annotation = {
+              const ann = {
                 id: mut.entity_id || uuidv7(),
                 item_id: itemId,
                 user_id: userId,
@@ -1443,7 +1439,7 @@ export class ContainedDatabase {
           }
         }
 
-        const record: SyncMutationRecord = {
+        const record = {
           mutation_id: mut.mutation_id,
           user_id: userId,
           entity: mut.entity,
@@ -1464,7 +1460,7 @@ export class ContainedDatabase {
   }
 }
 
-export function buildHighlightedSnippet(rawText: string, terms: string[]): string {
+export function buildHighlightedSnippet(rawText, terms) {
   const clean = (rawText || '').replace(/\s+/g, ' ').trim();
   if (!clean) return '';
   if (terms.length === 0) {
@@ -1482,16 +1478,34 @@ export function buildHighlightedSnippet(rawText: string, terms: string[]): strin
 
   const start = firstMatchIdx > 40 ? firstMatchIdx - 40 : 0;
   const windowStr = clean.slice(start, start + 180);
-  let escaped = escapeHtml(windowStr);
-
-  for (const rawTerm of terms) {
-    const safeTerm = escapeHtml(rawTerm.trim());
-    if (!safeTerm) continue;
-    const re = new RegExp(`(${safeTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-    escaped = escaped.replace(re, '<mark>$1</mark>');
+  const cleanTerms = Array.from(
+    new Set(
+      terms
+        .map((t) => t.trim())
+        .filter(Boolean)
+        .sort((a, b) => b.length - a.length)
+    )
+  );
+  if (cleanTerms.length === 0) {
+    return (start > 0 ? '...' : '') + escapeHtml(windowStr) + (start + 180 < clean.length ? '...' : '');
   }
-
-  return (start > 0 ? '...' : '') + escaped + (start + 180 < clean.length ? '...' : '');
+  const unionPattern = cleanTerms.map((t) => t.replace(/[.*+?^${}()|[]\]/g, '\$&')).join('|');
+  const re = new RegExp(`(${unionPattern})`, 'gi');
+  let out = '';
+  let lastIdx = 0;
+  let m;
+  while ((m = re.exec(windowStr)) !== null) {
+    if (m.index > lastIdx) {
+      out += escapeHtml(windowStr.slice(lastIdx, m.index));
+    }
+    out += `<mark>${escapeHtml(m[0])}</mark>`;
+    lastIdx = re.lastIndex;
+    if (m[0].length === 0) re.lastIndex++;
+  }
+  if (lastIdx < windowStr.length) {
+    out += escapeHtml(windowStr.slice(lastIdx));
+  }
+  return (start > 0 ? '...' : '') + out + (start + 180 < clean.length ? '...' : '');
 }
 
 export { parseAndNormalizeUrl };

@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { ReadingPlatformApp } from '../apps/web/src/app.ts';
-import { WorkerEngine } from '../apps/worker/src/worker.ts';
-import { ContainedDatabase } from '../packages/db/src/index.ts';
+import { ReadingPlatformApp } from '../apps/web/src/app.js';
+import { WorkerEngine } from '../apps/worker/src/worker.js';
+import { ContainedDatabase } from '../packages/db/src/index.js';
 
 const rootDir = process.env.PROJECT_ROOT || '/Users/harsha1/Documents/pocket_clone';
 const smokeDataDir = path.join(rootDir, '.cache', `smoke-${process.pid}-${Date.now()}`);
@@ -42,7 +42,7 @@ try {
     body: { email: 'smoke@example.com', password: 'SmokePassword123!' },
   });
   assert.equal(login.status, 200);
-  const token = (login.body as { sessionToken: string }).sessionToken;
+  const token = (login.body).sessionToken;
 
   const cap = await app.handleRequest({
     method: 'POST',
@@ -60,7 +60,7 @@ try {
     headers: { 'x-session-token': token },
   });
   assert.equal(searchRes.status, 200);
-  const hits = (searchRes.body as { hits: unknown[] }).hits;
+  const hits = (searchRes.body).hits;
   assert.equal(hits.length, 1);
 
   console.log(JSON.stringify({ status: 'passed', check: 'smoke', verifiedItems: hits.length }));

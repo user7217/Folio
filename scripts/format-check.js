@@ -3,8 +3,8 @@ import path from 'node:path';
 
 const rootDir = process.env.PROJECT_ROOT || '/Users/harsha1/Documents/pocket_clone';
 
-function collectCheckableFiles(dir: string): string[] {
-  const out: string[] = [];
+function collectCheckableFiles(dir) {
+  const out = [];
   if (!fs.existsSync(dir)) return out;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === 'dist' || entry.name === 'data') {
@@ -13,7 +13,7 @@ function collectCheckableFiles(dir: string): string[] {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       out.push(...collectCheckableFiles(full));
-    } else if (entry.isFile() && /\.(ts|json|md)$/.test(entry.name)) {
+    } else if (entry.isFile() && /\.(js|json|md)$/.test(entry.name)) {
       out.push(full);
     }
   }
@@ -21,7 +21,7 @@ function collectCheckableFiles(dir: string): string[] {
 }
 
 const files = collectCheckableFiles(rootDir);
-const errors: string[] = [];
+const errors = [];
 
 for (const f of files) {
   const raw = fs.readFileSync(f, 'utf8');

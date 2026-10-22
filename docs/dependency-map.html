@@ -1,0 +1,274 @@
+<title>ReaderKB Dependency Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: schematic sheet. Header strip, then a two-column bench: layered graph (left) + inspector (right); findings below. */
+:root {
+  --bg: #F2F4F6;
+  --sheet: #FBFCFD;
+  --ink: #18212C;
+  --muted: #5B6676;
+  --rule: #D5DBE3;
+  --grid: #E6EAEF;
+  --pkg: #0F7B6C;
+  --app: #2F55C8;
+  --tool: #9A6B1F;
+  --hot: #C2410C;
+  --edge: #8C97A6;
+  --pkg-bg: #E3F3F0;
+  --app-bg: #E6ECFB;
+  --tool-bg: #F5EEDF;
+  --display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0E131A; --sheet: #141A23; --ink: #E4E9F0; --muted: #98A3B3; --rule: #2A3341; --grid: #1B222D;
+  --pkg: #3CC4AE; --app: #7E9CF4; --tool: #D9A55A; --hot: #F08A4B; --edge: #5E6979;
+  --pkg-bg: #12302B; --app-bg: #1A2442; --tool-bg: #33280F; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0E131A; --sheet: #141A23; --ink: #E4E9F0; --muted: #98A3B3; --rule: #2A3341; --grid: #1B222D;
+  --pkg: #3CC4AE; --app: #7E9CF4; --tool: #D9A55A; --hot: #F08A4B; --edge: #5E6979;
+  --pkg-bg: #12302B; --app-bg: #1A2442; --tool-bg: #33280F; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.5; }
+.wrap { max-width: 1380px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 48px; display: grid; gap: 24px; }
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px 32px; border-bottom: 2px solid var(--ink); padding-bottom: 14px; }
+h1 { font-family: var(--display); font-weight: 600; font-size: 30px; line-height: 1.1; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+.sub { color: var(--muted); margin: 4px 0 0; max-width: 62ch; }
+.stats { display: flex; flex-wrap: wrap; gap: 6px 22px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.stats b { color: var(--ink); font-weight: 500; font-size: 15px; display: block; font-variant-numeric: tabular-nums; }
+
+.bench { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
+@media (max-width: 960px) { .bench { grid-template-columns: minmax(0, 1fr); } }
+
+.sheet { background: var(--sheet); border: 1px solid var(--rule); border-radius: 4px; min-width: 0; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--rule); font-size: 13px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.toolbar label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; margin-left: auto; }
+.toolbar input { accent-color: var(--app); }
+.canvas { overflow-x: auto; background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 24px 24px; }
+svg { display: block; }
+.layer-label { font-family: var(--mono); font-size: 10px; fill: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.edge { fill: none; stroke: var(--edge); stroke-width: 1; opacity: 0.45; transition: opacity .15s, stroke .15s; }
+.edge.type { stroke-dasharray: 3 3; }
+.edge.out { stroke: var(--hot); opacity: 1; stroke-width: 1.6; }
+.edge.in { stroke: var(--app); opacity: 1; stroke-width: 1.6; }
+.edge.dim { opacity: 0.07; }
+.node { cursor: pointer; }
+.node rect.box { stroke-width: 1.2; }
+.node text { font-family: var(--mono); font-size: 11.5px; fill: var(--ink); }
+.node text.grp { font-family: var(--body); font-size: 9.5px; fill: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.node.dim { opacity: 0.3; }
+.node.sel rect.box { stroke-width: 2.6; }
+.node:focus { outline: none; }
+.node:focus-visible rect.box { stroke-width: 3; stroke-dasharray: 4 2; }
+.standalone { padding: 10px 14px 14px; border-top: 1px solid var(--rule); font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.standalone button { font-family: var(--mono); font-size: 11.5px; background: var(--tool-bg); color: var(--ink); border: 1px solid var(--rule); border-radius: 3px; padding: 2px 8px; cursor: pointer; }
+.standalone button:focus-visible, .chip:focus-visible { outline: 2px solid var(--app); outline-offset: 1px; }
+
+.inspector { padding: 16px 16px 18px; display: grid; gap: 14px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); }
+.inspector h2 { font-family: var(--mono); font-weight: 500; font-size: 14px; margin: 0; word-break: break-all; }
+.meta { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.inspector h3 { font-family: var(--display); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 6px; }
+.inspector ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.inspector li { font-size: 12.5px; }
+.chip { font-family: var(--mono); font-size: 11.5px; background: none; border: 0; padding: 0; color: var(--app); cursor: pointer; text-align: left; text-decoration: underline; text-decoration-color: var(--rule); text-underline-offset: 3px; }
+.syms { font-family: var(--mono); font-size: 11px; color: var(--muted); word-break: break-word; }
+.exports { font-family: var(--mono); font-size: 11px; color: var(--ink); word-break: break-word; }
+.exports i { font-style: normal; color: var(--muted); }
+.none { color: var(--muted); font-size: 12px; }
+
+.findings { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.finding { background: var(--sheet); border: 1px solid var(--rule); border-left: 3px solid var(--sev); border-radius: 4px; padding: 14px 16px; min-width: 0; }
+.finding .sev { font-family: var(--display); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--sev); }
+.finding h4 { margin: 4px 0 6px; font-size: 15px; font-weight: 600; text-wrap: balance; }
+.finding p { margin: 0; color: var(--muted); font-size: 13px; max-width: 65ch; }
+.finding code { font-family: var(--mono); font-size: 12px; color: var(--ink); }
+section > h2.sec { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0 0 12px; }
+footer { color: var(--muted); font-size: 12px; }
+footer code { font-family: var(--mono); }
+@media (prefers-reduced-motion: reduce) { .edge { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>ReaderKB dependency map</h1>
+      <p class="sub">Every TypeScript and JavaScript file in <code>pocket_clone</code>, layered by how deep it sits in the import chain. Foundation code is at the bottom; entry points and tooling are at the top. Click a file to see what it uses and what uses it.</p>
+    </div>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <div class="bench">
+    <div class="sheet">
+      <div class="toolbar">
+        <div class="legend">
+          <span><i class="sw" style="background:var(--pkg)"></i>packages</span>
+          <span><i class="sw" style="background:var(--app)"></i>apps</span>
+          <span><i class="sw" style="background:var(--tool)"></i>tests, scripts, benchmark</span>
+          <span><svg width="22" height="6"><line x1="0" y1="3" x2="22" y2="3" stroke="var(--edge)" stroke-dasharray="3 3"/></svg>type-only import</span>
+        </div>
+        <label for="tooling"><input type="checkbox" id="tooling" checked> Show tooling</label>
+      </div>
+      <div class="canvas"><svg id="g" role="img" aria-label="Layered import graph"></svg></div>
+      <div class="standalone" id="standalone"></div>
+    </div>
+    <aside class="sheet inspector" id="inspector" aria-live="polite"></aside>
+  </div>
+
+  <section>
+    <h2 class="sec">What the graph shows</h2>
+    <div class="findings" id="findings"></div>
+  </section>
+
+  <footer>Built from the working tree on 2026-10-14 (includes uncommitted changes to <code>app.ts</code>, <code>server.ts</code>, <code>ui</code>, <code>article-processing</code>). Edges are static <code>import … from</code> statements between files; Node built-ins are listed per file but not drawn. <code>dist/</code> and <code>evidence/</code> are excluded.</footer>
+</div>
+
+<script>
+const G = {"nodes":[{"id":"apps/extension/background.js","group":"apps/extension","loc":36,"exports":{}},{"id":"apps/extension/extension-client.ts","group":"apps/extension","loc":132,"exports":{"interface":["ExtensionStorageState","ExtensionActionResult"],"type":["ExtensionHttpTransport"],"class":["ExtensionCaptureClient"]}},{"id":"apps/web/src/app.ts","group":"apps/web","loc":2266,"exports":{"interface":["AppRequest","AppResponse"],"class":["ReadingPlatformApp"]}},{"id":"apps/web/src/server.ts","group":"apps/web","loc":397,"exports":{"function":["seedShowcaseEssaysIfNeeded","createHttpServer"]}},{"id":"apps/worker/src/worker.ts","group":"apps/worker","loc":529,"exports":{"interface":["WorkerOptions"],"class":["WorkerEngine"]}},{"id":"benchmark/run.ts","group":"benchmark","loc":615,"exports":{"interface":["DatasetConfig"],"function":["runDatasetBenchmark"]}},{"id":"packages/article-processing/src/index.ts","group":"packages/article-processing","loc":989,"exports":{"const":["EXTRACTOR_NAME","EXTRACTOR_VERSION"],"function":["escapeHtml","decodeHtmlEntities","sanitizeImageUrlAttr","sanitizeHtml","extractPlainText","computeReadingTimeMinutes","extractArticle","discoverFeedsFromHtml","parseFeedXml","parsePdfBuffer","createZipArchive","extractZipSafely","parseEpubBuffer"],"interface":["ExtractedArticleResult","DiscoveredFeed","ParsedFeedEntry","ParsedFeed","ParsedPdfResult","ZipEntryData","ParsedEpubResult"]}},{"id":"packages/db/src/index.ts","group":"packages/db","loc":1498,"exports":{"const":["CURRENT_SCHEMA_VERSION"],"interface":["SchemaMigrationRecord","DatabaseState","SearchHit","QueryExplainPlan"],"function":["createEmptyDatabaseState","hashPassword","verifyPassword","sha256Hex","tokenizeTextForIndex","computeDeterministicEmbedding","cosineSimilarity","buildHighlightedSnippet"],"class":["FilesystemBlobStore","ContainedDatabase"]}},{"id":"packages/shared/src/anchoring.ts","group":"packages/shared","loc":263,"exports":{"interface":["TextAnchorInput","ReanchorResult"],"function":["buildTextAnchor","stringSimilarity","reanchorHighlight"]}},{"id":"packages/shared/src/authz.ts","group":"packages/shared","loc":163,"exports":{"interface":["AuthActor","ResourceContext","PolicyDecision"],"function":["can"]}},{"id":"packages/shared/src/index.ts","group":"packages/shared","loc":509,"exports":{"function":["uuidv7"],"type":["ThemeId","ThemePreference","ListLayout","UserRole","ProcessingStatus","LifecycleState","ContentType","CollectionRole","ErrorClass","OcrStatus","JobType","JobStatus","SyncResultStatus","GraphEdgeType","AuthPolicyName"],"interface":["ReaderSettings","UserSettings","User","Session","Invitation","PairingToken","TocEntry","EpubSpineItem","PdfPageContent","Item","UserItemState","ItemRevision","Tag","ItemTag","Collection","CollectionItem","CollectionMember","Annotation","Feed","FeedEntry","Job","ClientMutation","SyncMutationRecord","SyncConflict","GraphEdge","DocumentChunkEmbedding","AuditEvent","ExportArtifact","WorkerHeartbeat","RouteDefinition"],"const":["ROUTE_REGISTRY"]}},{"id":"packages/shared/src/search-parser.ts","group":"packages/shared","loc":376,"exports":{"type":["SearchStateFilter","SearchAstNode"],"interface":["SearchFilterNode","SearchTermNode","SearchOrNode","SearchAndNode","SearchParseError","SearchParseResult"],"function":["parseSearchQuery"]}},{"id":"packages/shared/src/ssrf.ts","group":"packages/shared","loc":687,"exports":{"class":["SsrfError"],"function":["parseIpv4LiteralToUint32","uint32ToIpv4String","checkIpv4Uint32Safety","parseIpv6Groups","checkIpSafety","validateAndPinDestination","safeFetch"],"interface":["DnsLookupRecord","ValidateDestinationOptions","PinnedDestination","SafeFetchRequest","RawTransportResponse","SafeFetchOptions","SafeFetchResponse"],"type":["DnsResolverFn","SafeFetchTransport"]}},{"id":"packages/shared/src/sync.ts","group":"packages/shared","loc":144,"exports":{"interface":["StateMergeOutcome","AnnotationMergeOutcome"],"function":["mergeItemStateMutation","evaluateAnnotationMutation"]}},{"id":"packages/shared/src/themes.ts","group":"packages/shared","loc":305,"exports":{"interface":["ThemeTokens","ThemeContrastAudit"],"const":["THEMES"],"function":["parseHexRgb","relativeLuminance","contrastRatio","verifyThemeContrast"]}},{"id":"packages/shared/src/url.ts","group":"packages/shared","loc":149,"exports":{"function":["isTrackingParam","parseAndNormalizeUrl","redactUrlForLog"],"interface":["NormalizedUrlResult"],"class":["UrlValidationError"]}},{"id":"packages/ui/src/index.ts","group":"packages/ui","loc":2840,"exports":{"function":["generateThemeStylesheet","renderInlineThemeBootstrapScript","renderAppScreenHtml","renderThemeScreenshotPng"],"const":["COMPONENT_ONLY_CSS"],"interface":["RenderScreenOptions"]}},{"id":"scripts/backup.ts","group":"scripts","loc":62,"exports":{"interface":["BackupManifest"],"function":["createBackup"]}},{"id":"scripts/build.ts","group":"scripts","loc":68,"exports":{}},{"id":"scripts/format-check.ts","group":"scripts","loc":49,"exports":{}},{"id":"scripts/generate-docs.ts","group":"scripts","loc":504,"exports":{}},{"id":"scripts/lint.ts","group":"scripts","loc":103,"exports":{}},{"id":"scripts/migrate.ts","group":"scripts","loc":18,"exports":{"function":["runMigrations"]}},{"id":"scripts/restore.ts","group":"scripts","loc":54,"exports":{"function":["restoreBackup"]}},{"id":"scripts/smoke.ts","group":"scripts","loc":70,"exports":{}},{"id":"scripts/typecheck.ts","group":"scripts","loc":36,"exports":{}},{"id":"scripts/verify.ts","group":"scripts","loc":96,"exports":{}},{"id":"tests/e2e/workflows.test.ts","group":"tests","loc":573,"exports":{}},{"id":"tests/integration/platform.test.ts","group":"tests","loc":685,"exports":{}},{"id":"tests/security/adversarial.test.ts","group":"tests","loc":318,"exports":{}},{"id":"tests/unit/core.test.ts","group":"tests","loc":521,"exports":{}}],"edges":[{"source":"apps/web/src/app.ts","target":"packages/article-processing/src/index.ts","names":["EXTRACTOR_NAME","EXTRACTOR_VERSION","discoverFeedsFromHtml","parseEpubBuffer","parsePdfBuffer"],"typeOnly":false},{"source":"apps/web/src/app.ts","target":"packages/db/src/index.ts","names":["CURRENT_SCHEMA_VERSION","ContainedDatabase","hashPassword","parseAndNormalizeUrl","sha256Hex","verifyPassword"],"typeOnly":false},{"source":"apps/web/src/app.ts","target":"packages/shared/src/anchoring.ts","names":["buildTextAnchor"],"typeOnly":false},{"source":"apps/web/src/app.ts","target":"packages/shared/src/authz.ts","names":["AuthActor","ResourceContext","can"],"typeOnly":false},{"source":"apps/web/src/app.ts","target":"packages/shared/src/index.ts","names":["Annotation","ClientMutation","Collection","CollectionRole","Item","RouteDefinition","ThemeId","User","ROUTE_REGISTRY","uuidv7"],"typeOnly":false},{"source":"apps/web/src/app.ts","target":"packages/shared/src/themes.ts","names":["THEMES"],"typeOnly":false},{"source":"apps/web/src/app.ts","target":"packages/shared/src/url.ts","names":["UrlValidationError"],"typeOnly":false},{"source":"apps/web/src/app.ts","target":"packages/ui/src/index.ts","names":["renderAppScreenHtml"],"typeOnly":false},{"source":"apps/web/src/server.ts","target":"packages/article-processing/src/index.ts","names":["extractArticle"],"typeOnly":false},{"source":"apps/web/src/server.ts","target":"packages/db/src/index.ts","names":["ContainedDatabase","hashPassword"],"typeOnly":false},{"source":"apps/web/src/server.ts","target":"packages/shared/src/index.ts","names":["uuidv7"],"typeOnly":false},{"source":"apps/web/src/server.ts","target":"apps/worker/src/worker.ts","names":["WorkerEngine"],"typeOnly":false},{"source":"apps/web/src/server.ts","target":"apps/web/src/app.ts","names":["ReadingPlatformApp"],"typeOnly":false},{"source":"apps/worker/src/worker.ts","target":"packages/article-processing/src/index.ts","names":["EXTRACTOR_NAME","EXTRACTOR_VERSION","extractArticle","parseFeedXml"],"typeOnly":false},{"source":"apps/worker/src/worker.ts","target":"packages/db/src/index.ts","names":["ContainedDatabase","sha256Hex"],"typeOnly":false},{"source":"apps/worker/src/worker.ts","target":"packages/shared/src/index.ts","names":["FeedEntry","Job","uuidv7"],"typeOnly":false},{"source":"apps/worker/src/worker.ts","target":"packages/shared/src/ssrf.ts","names":["DnsResolverFn","SafeFetchTransport","SsrfError","safeFetch"],"typeOnly":false},{"source":"apps/worker/src/worker.ts","target":"packages/shared/src/url.ts","names":["redactUrlForLog"],"typeOnly":false},{"source":"benchmark/run.ts","target":"apps/web/src/app.ts","names":["ReadingPlatformApp"],"typeOnly":false},{"source":"benchmark/run.ts","target":"apps/worker/src/worker.ts","names":["WorkerEngine"],"typeOnly":false},{"source":"benchmark/run.ts","target":"packages/article-processing/src/index.ts","names":["EXTRACTOR_NAME","EXTRACTOR_VERSION"],"typeOnly":false},{"source":"benchmark/run.ts","target":"packages/db/src/index.ts","names":["ContainedDatabase","sha256Hex"],"typeOnly":false},{"source":"benchmark/run.ts","target":"packages/shared/src/index.ts","names":["ClientMutation","Item","ItemRevision","uuidv7"],"typeOnly":false},{"source":"packages/article-processing/src/index.ts","target":"packages/shared/src/index.ts","names":["EpubSpineItem","OcrStatus","PdfPageContent","TocEntry"],"typeOnly":true},{"source":"packages/article-processing/src/index.ts","target":"packages/shared/src/url.ts","names":["parseAndNormalizeUrl"],"typeOnly":false},{"source":"packages/db/src/index.ts","target":"packages/article-processing/src/index.ts","names":["escapeHtml"],"typeOnly":false},{"source":"packages/db/src/index.ts","target":"packages/shared/src/anchoring.ts","names":["reanchorHighlight"],"typeOnly":false},{"source":"packages/db/src/index.ts","target":"packages/shared/src/index.ts","names":["Annotation","AuditEvent","ClientMutation","Collection","CollectionItem","CollectionMember","CollectionRole","DocumentChunkEmbedding","ExportArtifact","Feed","FeedEntry","GraphEdge","Invitation","Item","ItemRevision","ItemTag","Job","JobType","PairingToken","Session","SyncConflict","SyncMutationRecord","Tag","User","UserItemState","WorkerHeartbeat","uuidv7"],"typeOnly":false},{"source":"packages/db/src/index.ts","target":"packages/shared/src/search-parser.ts","names":["SearchAstNode","parseSearchQuery"],"typeOnly":false},{"source":"packages/db/src/index.ts","target":"packages/shared/src/sync.ts","names":["evaluateAnnotationMutation","mergeItemStateMutation"],"typeOnly":false},{"source":"packages/db/src/index.ts","target":"packages/shared/src/url.ts","names":["parseAndNormalizeUrl"],"typeOnly":false},{"source":"packages/shared/src/authz.ts","target":"packages/shared/src/index.ts","names":["Annotation","AuthPolicyName","Collection","CollectionMember","ExportArtifact","Feed","Item","User"],"typeOnly":true},{"source":"packages/shared/src/search-parser.ts","target":"packages/shared/src/index.ts","names":["ContentType"],"typeOnly":true},{"source":"packages/shared/src/ssrf.ts","target":"packages/shared/src/url.ts","names":["parseAndNormalizeUrl","UrlValidationError"],"typeOnly":false},{"source":"packages/shared/src/sync.ts","target":"packages/shared/src/index.ts","names":["Annotation","ClientMutation","LifecycleState","SyncResultStatus","UserItemState"],"typeOnly":true},{"source":"packages/shared/src/themes.ts","target":"packages/shared/src/index.ts","names":["ThemeId"],"typeOnly":true},{"source":"packages/ui/src/index.ts","target":"packages/article-processing/src/index.ts","names":["escapeHtml"],"typeOnly":false},{"source":"packages/ui/src/index.ts","target":"packages/shared/src/index.ts","names":["Annotation","Item","ThemeId","ThemePreference","TocEntry","UserItemState","UserSettings"],"typeOnly":true},{"source":"packages/ui/src/index.ts","target":"packages/shared/src/themes.ts","names":["THEMES","parseHexRgb"],"typeOnly":false},{"source":"scripts/backup.ts","target":"packages/article-processing/src/index.ts","names":["createZipArchive","ZipEntryData"],"typeOnly":false},{"source":"scripts/backup.ts","target":"packages/db/src/index.ts","names":["ContainedDatabase"],"typeOnly":false},{"source":"scripts/build.ts","target":"packages/shared/src/index.ts","names":["ThemeId"],"typeOnly":true},{"source":"scripts/build.ts","target":"packages/shared/src/themes.ts","names":["THEMES","verifyThemeContrast"],"typeOnly":false},{"source":"scripts/build.ts","target":"packages/ui/src/index.ts","names":["renderAppScreenHtml","renderThemeScreenshotPng"],"typeOnly":false},{"source":"scripts/lint.ts","target":"packages/ui/src/index.ts","names":["COMPONENT_ONLY_CSS"],"typeOnly":false},{"source":"scripts/migrate.ts","target":"packages/db/src/index.ts","names":["ContainedDatabase"],"typeOnly":false},{"source":"scripts/restore.ts","target":"packages/article-processing/src/index.ts","names":["extractZipSafely"],"typeOnly":false},{"source":"scripts/restore.ts","target":"scripts/backup.ts","names":["BackupManifest"],"typeOnly":true},{"source":"scripts/smoke.ts","target":"apps/web/src/app.ts","names":["ReadingPlatformApp"],"typeOnly":false},{"source":"scripts/smoke.ts","target":"apps/worker/src/worker.ts","names":["WorkerEngine"],"typeOnly":false},{"source":"scripts/smoke.ts","target":"packages/db/src/index.ts","names":["ContainedDatabase"],"typeOnly":false},{"source":"tests/e2e/workflows.test.ts","target":"apps/extension/extension-client.ts","names":["ExtensionCaptureClient"],"typeOnly":false},{"source":"tests/e2e/workflows.test.ts","target":"apps/web/src/app.ts","names":["ReadingPlatformApp"],"typeOnly":false},{"source":"tests/e2e/workflows.test.ts","target":"apps/worker/src/worker.ts","names":["WorkerEngine"],"typeOnly":false},{"source":"tests/e2e/workflows.test.ts","target":"packages/article-processing/src/index.ts","names":["createZipArchive"],"typeOnly":false},{"source":"tests/e2e/workflows.test.ts","target":"packages/db/src/index.ts","names":["ContainedDatabase"],"typeOnly":false},{"source":"tests/e2e/workflows.test.ts","target":"packages/shared/src/index.ts","names":["ThemeId"],"typeOnly":true},{"source":"tests/e2e/workflows.test.ts","target":"packages/shared/src/themes.ts","names":["THEMES","verifyThemeContrast"],"typeOnly":false},{"source":"tests/integration/platform.test.ts","target":"apps/web/src/app.ts","names":["ReadingPlatformApp"],"typeOnly":false},{"source":"tests/integration/platform.test.ts","target":"apps/worker/src/worker.ts","names":["WorkerEngine"],"typeOnly":false},{"source":"tests/integration/platform.test.ts","target":"packages/article-processing/src/index.ts","names":["createZipArchive"],"typeOnly":false},{"source":"tests/integration/platform.test.ts","target":"packages/db/src/index.ts","names":["ContainedDatabase","createEmptyDatabaseState"],"typeOnly":false},{"source":"tests/integration/platform.test.ts","target":"packages/shared/src/index.ts","names":["ROUTE_REGISTRY","uuidv7"],"typeOnly":false},{"source":"tests/integration/platform.test.ts","target":"scripts/backup.ts","names":["createBackup"],"typeOnly":false},{"source":"tests/integration/platform.test.ts","target":"scripts/restore.ts","names":["restoreBackup"],"typeOnly":false},{"source":"tests/security/adversarial.test.ts","target":"apps/web/src/app.ts","names":["ReadingPlatformApp"],"typeOnly":false},{"source":"tests/security/adversarial.test.ts","target":"apps/worker/src/worker.ts","names":["WorkerEngine"],"typeOnly":false},{"source":"tests/security/adversarial.test.ts","target":"packages/article-processing/src/index.ts","names":["createZipArchive","extractZipSafely","parsePdfBuffer"],"typeOnly":false},{"source":"tests/security/adversarial.test.ts","target":"packages/db/src/index.ts","names":["ContainedDatabase"],"typeOnly":false},{"source":"tests/security/adversarial.test.ts","target":"packages/shared/src/ssrf.ts","names":["SsrfError","safeFetch"],"typeOnly":false},{"source":"tests/unit/core.test.ts","target":"packages/article-processing/src/index.ts","names":["computeReadingTimeMinutes","createZipArchive","discoverFeedsFromHtml","extractArticle","extractZipSafely","parseEpubBuffer","parseFeedXml","parsePdfBuffer","sanitizeHtml"],"typeOnly":false},{"source":"tests/unit/core.test.ts","target":"packages/shared/src/anchoring.ts","names":["buildTextAnchor","reanchorHighlight"],"typeOnly":false},{"source":"tests/unit/core.test.ts","target":"packages/shared/src/authz.ts","names":["can"],"typeOnly":false},{"source":"tests/unit/core.test.ts","target":"packages/shared/src/index.ts","names":["ROUTE_REGISTRY","uuidv7"],"typeOnly":false},{"source":"tests/unit/core.test.ts","target":"packages/shared/src/search-parser.ts","names":["parseSearchQuery"],"typeOnly":false},{"source":"tests/unit/core.test.ts","target":"packages/shared/src/ssrf.ts","names":["SsrfError","checkIpSafety","parseIpv4LiteralToUint32","safeFetch","validateAndPinDestination"],"typeOnly":false},{"source":"tests/unit/core.test.ts","target":"packages/shared/src/sync.ts","names":["evaluateAnnotationMutation","mergeItemStateMutation"],"typeOnly":false},{"source":"tests/unit/core.test.ts","target":"packages/shared/src/themes.ts","names":["THEMES","verifyThemeContrast"],"typeOnly":false},{"source":"tests/unit/core.test.ts","target":"packages/shared/src/url.ts","names":["UrlValidationError","parseAndNormalizeUrl","redactUrlForLog"],"typeOnly":false},{"source":"tests/unit/core.test.ts","target":"packages/ui/src/index.ts","names":["COMPONENT_ONLY_CSS","renderInlineThemeBootstrapScript"],"typeOnly":false}],"unresolved":[],"external":{"crypto":["apps/web/src/app.ts","apps/worker/src/worker.ts","packages/article-processing/src/index.ts","packages/db/src/index.ts","packages/shared/src/index.ts","scripts/backup.ts","scripts/build.ts","scripts/restore.ts"],"fs":["apps/web/src/app.ts","benchmark/run.ts","packages/db/src/index.ts","scripts/backup.ts","scripts/build.ts","scripts/format-check.ts","scripts/generate-docs.ts","scripts/lint.ts","scripts/restore.ts","scripts/smoke.ts","scripts/typecheck.ts","scripts/verify.ts","tests/e2e/workflows.test.ts","tests/integration/platform.test.ts","tests/security/adversarial.test.ts"],"http":["apps/web/src/server.ts","packages/shared/src/ssrf.ts"],"url":["apps/web/src/server.ts","apps/worker/src/worker.ts","scripts/backup.ts","scripts/migrate.ts","scripts/restore.ts","scripts/typecheck.ts"],"os":["benchmark/run.ts"],"path":["benchmark/run.ts","packages/db/src/index.ts","scripts/backup.ts","scripts/build.ts","scripts/format-check.ts","scripts/generate-docs.ts","scripts/lint.ts","scripts/restore.ts","scripts/smoke.ts","scripts/typecheck.ts","scripts/verify.ts","tests/e2e/workflows.test.ts","tests/integration/platform.test.ts","tests/security/adversarial.test.ts"],"zlib":["packages/article-processing/src/index.ts","packages/shared/src/ssrf.ts","packages/ui/src/index.ts","tests/security/adversarial.test.ts"],"dns":["packages/shared/src/ssrf.ts"],"https":["packages/shared/src/ssrf.ts"],"net":["packages/shared/src/ssrf.ts"],"assert/strict":["scripts/smoke.ts","tests/e2e/workflows.test.ts","tests/integration/platform.test.ts","tests/security/adversarial.test.ts","tests/unit/core.test.ts"],"child_process":["scripts/verify.ts","tests/integration/platform.test.ts"],"test":["tests/e2e/workflows.test.ts","tests/integration/platform.test.ts","tests/security/adversarial.test.ts","tests/unit/core.test.ts"]}};
+
+const FINDINGS = [
+  { sev: 'hot', label: 'Layering leak', title: 'db and ui depend on article-processing for one helper',
+    body: '<code>packages/db</code> and <code>packages/ui</code> import <code>escapeHtml</code> from <code>article-processing</code> and nothing else from it (4 and 49 call sites). Persistence and rendering are coupled to the 989-line extraction module. Moving <code>escapeHtml</code> into <code>packages/shared</code> removes both edges and leaves article-processing used only by apps, scripts and tests.' },
+  { sev: 'hot', label: 'Test gap', title: 'The tested extension client is not the shipped one',
+    body: '<code>apps/extension/extension-client.ts</code> is imported only by the e2e test. The extension that actually ships (<code>manifest.json</code> → <code>background.js</code>) reimplements capture separately, never checks the response status, and fails silently when no token is set. The e2e suite proves the TS client works, not the extension.' },
+  { sev: 'warn', label: 'Hotspots', title: 'Three files hold 44% of all lines',
+    body: '<code>ui/index.ts</code> (2,840), <code>web/app.ts</code> (2,266) and <code>db/index.ts</code> (1,498) are 6,604 of 15,055 lines. app.ts and ui are also the files with uncommitted edits. These are the first candidates to split if review or merge friction grows.' },
+  { sev: 'warn', label: 'Cross-app import', title: 'The web server embeds the worker',
+    body: '<code>apps/web/src/server.ts</code> imports <code>WorkerEngine</code> from <code>apps/worker</code> and starts it in-process, while <code>package.json</code> also has a separate <code>worker</code> script. If both run against the same JSON store, jobs can be processed twice or writes can race. Worth confirming which deployment mode is intended.' },
+  { sev: 'ok', label: 'Healthy', title: 'No import cycles, clean layer order',
+    body: 'Imports flow strictly downward: shared → article-processing → db / ui → worker / web app → server. <code>shared/index.ts</code> is the most depended-on file (15 importers) and is almost entirely types (30 interfaces, 15 type aliases), which is the right shape for a base module.' },
+];
+
+const TIER = (g) => g.startsWith('packages/') ? 'pkg' : g.startsWith('apps/') ? 'app' : 'tool';
+const short = (id) => id.replace(/^packages\//, '').replace(/^apps\//, '').replace('/src/', '/');
+const byId = Object.fromEntries(G.nodes.map((n) => [n.id, n]));
+const ext = {};
+for (const [mod, files] of Object.entries(G.external)) for (const f of files) (ext[f] ??= []).push(mod);
+const outE = {}, inE = {};
+for (const e of G.edges) { (outE[e.source] ??= []).push(e); (inE[e.target] ??= []).push(e); }
+
+// Depth = longest path to a leaf; computed once over the full graph so layers stay stable when filtering.
+const depth = {};
+const dfs = (id) => depth[id] ?? (depth[id] = Math.max(-1, ...(outE[id] || []).map((e) => dfs(e.target))) + 1);
+G.nodes.forEach((n) => dfs(n.id));
+
+const totalLoc = G.nodes.reduce((s, n) => s + n.loc, 0);
+document.getElementById('stats').innerHTML = [
+  [G.nodes.length, 'files'], [G.edges.length, 'import edges'], [totalLoc.toLocaleString(), 'lines'], [0, 'cycles'],
+].map(([v, l]) => `<span><b>${v}</b>${l}</span>`).join('');
+
+let selected = 'packages/db/src/index.ts';
+const showTooling = document.getElementById('tooling');
+
+function visibleNodes() {
+  return G.nodes.filter((n) => (showTooling.checked || TIER(n.group) !== 'tool'));
+}
+
+function layout(nodes) {
+  const connected = nodes.filter((n) => (outE[n.id] || []).length || (inE[n.id] || []).some((e) => nodes.includes(byId[e.source])));
+  const ids = new Set(connected.map((n) => n.id));
+  const maxD = Math.max(...connected.map((n) => depth[n.id]));
+  const layers = Array.from({ length: maxD + 1 }, () => []);
+  connected.forEach((n) => layers[depth[n.id]].push(n.id));
+  layers.forEach((l) => l.sort());
+  // Barycenter sweeps to reduce crossings.
+  const pos = {};
+  const setPos = () => layers.forEach((l) => l.forEach((id, i) => (pos[id] = i - (l.length - 1) / 2)));
+  setPos();
+  for (let it = 0; it < 6; it++) {
+    for (const l of layers) {
+      const bc = (id) => {
+        const nb = [...(outE[id] || []).map((e) => e.target), ...(inE[id] || []).map((e) => e.source)].filter((x) => ids.has(x));
+        return nb.length ? nb.reduce((s, x) => s + pos[x], 0) / nb.length : pos[id];
+      };
+      const b = Object.fromEntries(l.map((id) => [id, bc(id)]));
+      l.sort((a, c) => b[a] - b[c]);
+    }
+    setPos();
+  }
+  return { layers, ids, standalone: nodes.filter((n) => !ids.has(n.id)) };
+}
+
+const NW = 176, NH = 40, GX = 18, RH = 108, PADL = 64, PADT = 26;
+
+function render() {
+  const nodes = visibleNodes();
+  const { layers, ids, standalone } = layout(nodes);
+  if (!byId[selected] || !nodes.includes(byId[selected])) selected = 'packages/db/src/index.ts';
+  const maxW = Math.max(...layers.map((l) => l.length));
+  const W = PADL + maxW * (NW + GX) + 16;
+  const H = PADT + layers.length * RH;
+  const xy = {};
+  layers.forEach((l, d) => {
+    const y = PADT + (layers.length - 1 - d) * RH;
+    const off = PADL + ((maxW - l.length) * (NW + GX)) / 2;
+    l.forEach((id, i) => (xy[id] = { x: off + i * (NW + GX), y }));
+  });
+  const nb = new Set([selected, ...(outE[selected] || []).map((e) => e.target), ...(inE[selected] || []).map((e) => e.source)]);
+  let s = '';
+  layers.forEach((l, d) => {
+    const y = PADT + (layers.length - 1 - d) * RH + NH / 2 + 4;
+    s += `<text class="layer-label" x="10" y="${y}">L${d}</text>`;
+  });
+  for (const e of G.edges) {
+    if (!ids.has(e.source) || !ids.has(e.target)) continue;
+    const a = xy[e.source], b = xy[e.target];
+    const x1 = a.x + NW / 2, y1 = a.y + NH, x2 = b.x + NW / 2, y2 = b.y;
+    const my = (y2 - y1) * 0.5;
+    const cls = e.source === selected ? 'out' : e.target === selected ? 'in' : 'dim';
+    s += `<path class="edge ${e.typeOnly ? 'type' : ''} ${cls}" d="M${x1},${y1} C${x1},${y1 + my} ${x2},${y2 - my} ${x2},${y2}"><title>${short(e.source)} → ${short(e.target)}: ${e.names.join(', ')}</title></path>`;
+  }
+  const maxLoc = Math.max(...G.nodes.map((n) => n.loc));
+  for (const id of ids) {
+    const n = byId[id], { x, y } = xy[id], t = TIER(n.group);
+    const bar = Math.max(3, ((NW - 16) * n.loc) / maxLoc);
+    const name = short(id).split('/');
+    const file = name.pop(), dir = name.join('/') || '·';
+    s += `<g class="node ${id === selected ? 'sel' : ''} ${nb.has(id) ? '' : 'dim'}" data-id="${id}" tabindex="0" role="button" aria-label="${id}, ${n.loc} lines">
+      <rect class="box" x="${x}" y="${y}" width="${NW}" height="${NH}" rx="3" fill="var(--${t}-bg)" stroke="var(--${t})"/>
+      <rect x="${x + 8}" y="${y + NH - 6}" width="${bar}" height="2.5" fill="var(--${t})"/>
+      <text class="grp" x="${x + 8}" y="${y + 13}">${dir}</text>
+      <text x="${x + 8}" y="${y + 27}">${file}</text>
+      <text class="grp" x="${x + NW - 8}" y="${y + 13}" text-anchor="end">${n.loc.toLocaleString()}</text>
+    </g>`;
+  }
+  const svg = document.getElementById('g');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('width', W);
+  svg.setAttribute('height', H);
+  svg.innerHTML = s;
+  document.getElementById('standalone').innerHTML = standalone.length
+    ? `<span>No internal imports:</span>` + standalone.map((n) => `<button type="button" data-id="${n.id}">${n.id}</button>`).join('')
+    : '';
+  inspect();
+}
+
+function inspect() {
+  const n = byId[selected];
+  const t = TIER(n.group);
+  const ex = Object.entries(n.exports);
+  const row = (e, key) => `<li><button class="chip" type="button" data-id="${e[key]}">${e[key]}</button>${e.typeOnly ? ' <span class="none">(types)</span>' : ''}<div class="syms">${e.names.join(', ')}</div></li>`;
+  const outs = outE[selected] || [], ins = inE[selected] || [];
+  document.getElementById('inspector').innerHTML = `
+    <div><h2>${n.id}</h2>
+      <div class="meta"><span style="color:var(--${t})">${n.group}</span><span>${n.loc.toLocaleString()} lines</span><span>layer L${depth[n.id]}</span><span>${ins.length} in · ${outs.length} out</span></div></div>
+    <div><h3>Exports</h3>${ex.length ? `<div class="exports">${ex.map(([k, v]) => `<i>${k}</i> ${v.join(', ')}`).join('<br>')}</div>` : '<span class="none">Nothing exported (entry point or script)</span>'}</div>
+    <div><h3>Depends on</h3>${outs.length ? `<ul>${outs.map((e) => row(e, 'target')).join('')}</ul>` : '<span class="none">No internal imports</span>'}</div>
+    <div><h3>Used by</h3>${ins.length ? `<ul>${ins.map((e) => row(e, 'source')).join('')}</ul>` : '<span class="none">Not imported by any file</span>'}</div>
+    <div><h3>Node built-ins</h3>${ext[n.id] ? `<div class="syms">${ext[n.id].join(', ')}</div>` : '<span class="none">None</span>'}</div>`;
+}
+
+function pick(id) { if (byId[id]) { selected = id; if (TIER(byId[id].group) === 'tool') showTooling.checked = true; render(); } }
+document.addEventListener('click', (ev) => { const el = ev.target.closest('[data-id]'); if (el) pick(el.dataset.id); });
+document.addEventListener('keydown', (ev) => { if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.closest?.('.node')) { ev.preventDefault(); pick(ev.target.closest('.node').dataset.id); } });
+showTooling.addEventListener('change', render);
+
+const SEV = { hot: 'var(--hot)', warn: 'var(--tool)', ok: 'var(--pkg)' };
+document.getElementById('findings').innerHTML = FINDINGS.map((f) => `<article class="finding" style="--sev:${SEV[f.sev]}"><div class="sev">${f.label}</div><h4>${f.title}</h4><p>${f.body}</p></article>`).join('');
+render();
+</script>

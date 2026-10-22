@@ -1,26 +1,9 @@
-export interface TextAnchorInput {
-  exactQuote: string;
-  prefix: string;
-  suffix: string;
-  startOffset: number;
-  endOffset: number;
-}
 
-export interface ReanchorResult {
-  orphaned: boolean;
-  startOffset: number;
-  endOffset: number;
-  exactQuote: string;
-  prefix: string;
-  suffix: string;
-  matchType: 'exact_offset' | 'context_quote' | 'fuzzy' | 'orphaned';
-  similarity: number;
-}
 
 /**
  * Extracts a 32-character prefix and suffix around [startOffset, endOffset] in normalized text.
  */
-export function buildTextAnchor(text: string, startOffset: number, endOffset: number): TextAnchorInput {
+export function buildTextAnchor(text, startOffset, endOffset) {
   const safeStart = Math.max(0, Math.min(text.length, startOffset));
   const safeEnd = Math.max(safeStart, Math.min(text.length, endOffset));
   const exactQuote = text.slice(safeStart, safeEnd);
@@ -38,14 +21,14 @@ export function buildTextAnchor(text: string, startOffset: number, endOffset: nu
 /**
  * Computes normalized Levenshtein similarity in [0, 1] between two strings.
  */
-export function stringSimilarity(a: string, b: string): number {
+export function stringSimilarity(a, b) {
   if (a === b) return 1;
   if (!a.length || !b.length) return 0;
   const maxLen = Math.max(a.length, b.length);
   if (maxLen > 1024) {
     // Use 3-gram Jaccard similarity for long strings
-    const ngrams = (s: string): Set<string> => {
-      const set = new Set<string>();
+    const ngrams = (s) => {
+      const set = new Set();
       for (let i = 0; i <= s.length - 3; i++) {
         set.add(s.slice(i, i + 3));
       }
@@ -86,10 +69,10 @@ export function stringSimilarity(a: string, b: string): number {
  * 4. Otherwise marks the anchor `orphaned` (never attaches a highlight to the wrong passage).
  */
 export function reanchorHighlight(
-  newText: string,
-  anchor: TextAnchorInput,
-  fuzzyThreshold: number = 0.80
-): ReanchorResult {
+  newText,
+  anchor,
+  fuzzyThreshold = 0.80
+) {
   const quote = anchor.exactQuote;
   if (!quote || !newText) {
     return {
@@ -120,7 +103,7 @@ export function reanchorHighlight(
   }
 
   // 2. Find all exact occurrences of quote and score by prefix/suffix context
-  const occurrences: number[] = [];
+  const occurrences = [];
   let searchPos = 0;
   while (searchPos <= newText.length - quote.length) {
     const idx = newText.indexOf(quote, searchPos);
@@ -143,18 +126,22 @@ export function reanchorHighlight(
   if (occurrences.length > 1) {
     let bestIdx = -1;
     let bestContextScore = -1;
+    let tiedBest = false;
     for (const idx of occurrences) {
       const candPrefix = newText.slice(Math.max(0, idx - 32), idx);
       const candSuffix = newText.slice(idx + quote.length, Math.min(newText.length, idx + quote.length + 32));
-      const pScore = anchor.prefix ? stringSimilarity(anchor.prefix, candPrefix) : 0.5;
-      const sScore = anchor.suffix ? stringSimilarity(anchor.suffix, candSuffix) : 0.5;
+      const pScore = anchor.prefix ? stringSimilarity(anchor.prefix, candPrefix) : 0;
+      const sScore = anchor.suffix ? stringSimilarity(anchor.suffix, candSuffix) : 0;
       const score = (pScore + sScore) / 2;
-      if (score > bestContextScore) {
+      if (score > bestContextScore + 1e-6) {
         bestContextScore = score;
         bestIdx = idx;
+        tiedBest = false;
+      } else if (Math.abs(score - bestContextScore) <= 1e-6) {
+        tiedBest = true;
       }
     }
-    if (bestIdx !== -1 && bestContextScore >= 0.5) {
+    if (bestIdx !== -1 && !tiedBest && bestContextScore >= 0.5) {
       const updated = buildTextAnchor(newText, bestIdx, bestIdx + quote.length);
       return {
         orphaned: false,
@@ -165,14 +152,14 @@ export function reanchorHighlight(
     }
   }
 
-  // 3. Fuzzy match using context anchor (prefix + quote + suffix) or sliding sentence window
+  // 3. Fuzzy match using context anchor (prefix + quote + suffix) or bounded sliding sentence window
   const qLen = quote.length;
   let bestStart = -1;
   let bestEnd = -1;
   let bestScore = 0;
 
   // Check if prefix or suffix appears directly in newText to narrow candidate window
-  const candidateStarts = new Set<number>();
+  const candidateStarts = new Set();
   if (anchor.prefix && anchor.prefix.length >= 8) {
     const pIdx = newText.indexOf(anchor.prefix.slice(-12));
     if (pIdx !== -1) {
@@ -186,9 +173,12 @@ export function reanchorHighlight(
     }
   }
 
-  // Also add coarse step windows around original startOffset and across text
-  const step = Math.max(1, Math.floor(qLen / 6));
-  for (let pos = 0; pos <= newText.length - Math.max(4, Math.floor(qLen * 0.8)); pos += step) {
+  // Add bounded coarse step windows around original startOffset (capped at 512 candidates to prevent O(N*M) CPU lockup)
+  const maxPos = newText.length - Math.max(4, Math.floor(qLen * 0.8));
+  const windowStart = Math.max(0, (anchor.startOffset || 0) - 4096);
+  const windowEnd = Math.min(maxPos, (anchor.startOffset || 0) + 4096);
+  const step = Math.max(1, Math.floor(qLen / 6), Math.ceil((windowEnd - windowStart + 1) / 512));
+  for (let pos = windowStart; pos <= windowEnd && candidateStarts.size < 512; pos += step) {
     candidateStarts.add(pos);
   }
 
