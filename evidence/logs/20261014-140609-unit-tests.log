@@ -1,0 +1,26 @@
+# Command: node --test tests/unit/core.test.ts
+# Timestamp: 2026-10-14T14:06:09.862Z
+# Exit Code: 0
+# Duration: 137 ms
+
+✔ URL normalization strips tracking params, default ports, fragments, and sorts query params (6.879958ms)
+✔ SSRF destination validator blocks all private, loopback, metadata, IPv6, and exotic IPv4 encodings (4.133375ms)
+✔ SSRF safeFetch validates every redirect hop, blocks loops, and enforces streaming byte & decompression caps (0.629792ms)
+✔ HTML Sanitizer neutralizes XSS payload corpus and rewrites relative URLs (1.699667ms)
+✔ Article extractor extracts metadata, TOC, reading time, and marks login shells as partial (3.961ms)
+✔ Feed discovery and XML parser handle RSS, Atom, deduplication, and block XXE (0.959417ms)
+✔ Search query parser enforces operator precedence (OR tighter than AND) and compiles parameterized SQL (0.332042ms)
+✔ Route registry declares an explicit policy for every route and authorization policy enforces roles (0.307875ms)
+✔ Annotation anchoring re-anchors across exact offset, shifted context, fuzzy edit, and marks deleted passage as orphaned (2.767958ms)
+✔ Offline sync merge rules enforce monotonic progress, LWW state merge, and annotation conflict records (0.236334ms)
+✔ Four themes are token-complete, pass WCAG 2.2 AA contrast, and use zero hard-coded component colors (0.285667ms)
+✔ PDF and EPUB parsers validate magic bytes, extract pages/spine, and block zip-slip (0.804834ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 108.9695
+

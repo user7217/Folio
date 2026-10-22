@@ -46,7 +46,6 @@ test('E2E P0 Complete Workflow: bootstrap, invite registration, capture, retry f
   const dataDir = createE2eDataDir('p0-flow');
   try {
     const db = new ContainedDatabase(dataDir);
-    db.migrate();
     const app = new ReadingPlatformApp(db);
 
     let failNextFetch = false;
@@ -301,7 +300,6 @@ test('E2E P1 & P2 Workflows: PDF/EPUB upload & download, MV3 Extension pairing &
   const dataDir = createE2eDataDir('p1-p2-flow');
   try {
     const db = new ContainedDatabase(dataDir);
-    db.migrate();
     const app = new ReadingPlatformApp(db);
     const worker = new WorkerEngine(db, {
       resolver: async () => [{ address: '93.184.216.34', family: 4 }],
@@ -472,3 +470,103 @@ test('E2E P1 & P2 Workflows: PDF/EPUB upload & download, MV3 Extension pairing &
     fs.rmSync(dataDir, { recursive: true, force: true });
   }
 });
+
+test('E2E Long-Form Editorial GUI & Image Rendering: lazy data-src/srcset promotion, figure captions, library thumbnails, and reader lightbox', async () => {
+  const dataDir = createE2eDataDir('image-and-reader-gui');
+  try {
+    const db = new ContainedDatabase(dataDir);
+    const app = new ReadingPlatformApp(db);
+
+    const svgDiagramBase64 = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="240"><rect width="600" height="240" fill="#FAF8F5"/></svg>',
+      'utf8'
+    ).toString('base64');
+
+    const worker = new WorkerEngine(db, {
+      resolver: async () => [{ address: '93.184.216.34', family: 4 }],
+      transport: async () => ({
+        status: 200,
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+        body: Buffer.from(
+          `<!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <title>Long-Form Typography and Visual Figures</title>
+            <meta name="author" content="Edward Tufte" />
+            <meta name="description" content="How measure, leading, marginalia, and high-resolution figures work together." />
+          </head>
+          <body>
+            <article>
+              <h2>Section 1: Saccades and Line Width</h2>
+              <p>${'Sustained reading comfort depends on a 55ch to 68ch line measure and generous leading. '.repeat(12)}</p>
+              <figure>
+                <img data-src="/assets/diagrams/saccade-geometry.png" alt="Saccade geometry diagram" width="720" height="360" />
+                <figcaption>Figure 1: Lazy-loaded data-src diagram promoted to canonical src.</figcaption>
+              </figure>
+              <h2>Section 2: Responsive Srcset &amp; Base64 Diagrams</h2>
+              <figure>
+                <img srcset="/assets/diagrams/tufte-rail-2x.webp 2x, /assets/diagrams/tufte-rail-1x.webp 1x" alt="Tufte sidenote rail" />
+                <figcaption>Figure 2: Responsive srcset candidate promoted and rendered.</figcaption>
+              </figure>
+              <figure>
+                <img src="data:image/svg+xml;base64,${svgDiagramBase64}" alt="Inline base64 SVG diagram" />
+                <figcaption>Figure 3: Self-contained base64 SVG diagram.</figcaption>
+              </figure>
+            </article>
+          </body>
+          </html>`,
+          'utf8'
+        ),
+      }),
+    });
+
+    // Capture via auto-bootstrapped browser session on GET /
+    const initHome = await app.handleRequest({ method: 'GET', path: '/' });
+    assert.equal(initHome.status, 200);
+    const cookieHeader = initHome.headers['Set-Cookie']?.split(';')[0] || '';
+    assert.match(cookieHeader, /^rp_session=/);
+
+    const capRes = await app.handleRequest({
+      method: 'POST',
+      path: '/api/items/capture',
+      headers: { cookie: cookieHeader },
+      body: { url: 'https://typography.example.com/essays/figures' },
+    });
+    assert.equal(capRes.status, 201);
+    const itemId = (capRes.body as { item: { id: string } }).item.id;
+    await worker.drainQueue();
+
+    // Verify Library GUI renders featured image thumbnail (fallback from first body <img>)
+    const libRes = await app.handleRequest({
+      method: 'GET',
+      path: '/?screen=library&theme=editorial-light',
+      headers: { cookie: cookieHeader },
+    });
+    assert.equal(libRes.status, 200);
+    const libHtml = String(libRes.body);
+    runHtmlAccessibilityChecks(libHtml, 'editorial-light:library-with-images');
+    assert.match(libHtml, /class="item-thumbnail"/);
+    assert.match(libHtml, /src="https:\/\/typography\.example\.com\/assets\/diagrams\/saccade-geometry\.png"/);
+
+    // Verify Reader GUI renders 3-column layout, typography controls, all 3 figures, captions, and lightbox
+    const readerRes = await app.handleRequest({
+      method: 'GET',
+      path: `/?screen=reader&id=${itemId}&theme=editorial-light`,
+      headers: { cookie: cookieHeader },
+    });
+    assert.equal(readerRes.status, 200);
+    const readerHtml = String(readerRes.body);
+    runHtmlAccessibilityChecks(readerHtml, 'editorial-light:reader-with-images');
+    assert.match(readerHtml, /class="reader-workspace-grid"/);
+    assert.match(readerHtml, /data-reader-font="serif"/);
+    assert.match(readerHtml, /data-reader-width="65ch"/);
+    assert.match(readerHtml, /id="reader-image-lightbox"/);
+    assert.match(readerHtml, /src="https:\/\/typography\.example\.com\/assets\/diagrams\/saccade-geometry\.png"/);
+    assert.match(readerHtml, /src="https:\/\/typography\.example\.com\/assets\/diagrams\/tufte-rail-2x\.webp"/);
+    assert.match(readerHtml, new RegExp(`src="data:image/svg\\+xml;base64,${svgDiagramBase64.slice(0, 24)}`));
+    assert.match(readerHtml, /<figcaption>Figure 1: Lazy-loaded data-src diagram promoted to canonical src\.<\/figcaption>/);
+  } finally {
+    fs.rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+

@@ -2,8 +2,12 @@
 <html lang="en" data-theme="editorial-light">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Editorial Light — Self-Hosted Reading Platform</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <title>Editorial Light — Folio Reading App</title>
   <script id="theme-bootstrap">
 (function() {
   try {
@@ -162,7 +166,15 @@
 }
 
 /* COMPONENT_RULES */
-* { box-sizing: border-box; }
+*, *::before, *::after {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+}
 html, body {
   margin: 0;
   padding: 0;
@@ -171,6 +183,9 @@ html, body {
   font-family: var(--font-ui);
   font-size: var(--scale-base);
   line-height: var(--line-height-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior-y: none;
   transition: background-color var(--motion-duration) var(--motion-easing),
               color var(--motion-duration) var(--motion-easing);
 }
@@ -185,105 +200,2318 @@ html, body {
   outline: var(--focus-ring);
   outline-offset: 2px;
 }
+
+/* Reading Progress Bar (Fixed Top) */
+.reading-progress-track {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background-color: transparent;
+  z-index: 120;
+  pointer-events: none;
+}
+.reading-progress-fill {
+  height: 100%;
+  width: 0%;
+  background-color: var(--color-accent);
+  transition: width 80ms linear;
+}
+
+/* App Shell Layout */
 .app-shell {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 260px minmax(0, 1fr);
   min-height: 100vh;
+  min-height: 100dvh;
 }
-@media (max-width: 768px) {
+.app-shell.distraction-free {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (max-width: 900px) {
   .app-shell {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+    padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* Desktop Sidebar Navigation */
 .sidebar {
   background-color: var(--color-bg-elevated);
   border-right: var(--border-width) var(--border-style) var(--color-border);
-  padding: calc(var(--space-unit) * 2);
+  padding: calc(var(--space-unit) * 2.25) calc(var(--space-unit) * 1.75);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
 }
+@media (max-width: 900px) {
+  .sidebar {
+    display: none;
+  }
+}
+.brand-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: calc(var(--space-unit) * 2.25);
+  padding: 0 calc(var(--space-unit) * 0.5);
+}
+.brand-title {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--space-unit) * 1);
+  font-family: var(--font-reading);
+  font-weight: 700;
+  font-size: 1.2rem;
+  letter-spacing: -0.02em;
+  color: var(--color-text-primary);
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background-color: var(--color-accent);
+  color: var(--color-accent-text);
+  font-family: var(--font-reading);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.kbd-shortcut {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  background-color: var(--color-bg-subtle);
+  border: var(--border-width) var(--border-style) var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.nav-section-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  margin: calc(var(--space-unit) * 1.75) calc(var(--space-unit) * 0.75) calc(var(--space-unit) * 0.75);
+}
+.nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.nav-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: calc(var(--space-unit) * 0.85) calc(var(--space-unit) * 1.1);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--motion-duration) var(--motion-easing),
+              color var(--motion-duration) var(--motion-easing);
+}
+.nav-link:hover {
+  background-color: var(--color-bg-subtle);
+  color: var(--color-text-primary);
+}
+.nav-link.active {
+  background-color: var(--color-bg-subtle);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+.nav-count {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--color-text-muted);
+  background-color: var(--color-bg-primary);
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: var(--border-width) var(--border-style) var(--color-border);
+}
+.sidebar-footer {
+  margin-top: calc(var(--space-unit) * 2.5);
+  padding-top: calc(var(--space-unit) * 1.5);
+  border-top: var(--border-width) var(--border-style) var(--color-border);
+}
+.theme-pills {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: calc(var(--space-unit) * 0.6);
+  margin-top: calc(var(--space-unit) * 0.75);
+}
+.theme-pill-btn {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-secondary);
+  border: var(--border-width) var(--border-style) var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: calc(var(--space-unit) * 0.65) calc(var(--space-unit) * 0.75);
+  font-size: 0.76rem;
+  font-family: var(--font-ui);
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  min-height: 38px;
+  transition: all var(--motion-duration) var(--motion-easing);
+}
+.theme-pill-btn:hover, .theme-pill-btn.active {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background-color: var(--color-bg-subtle);
+  font-weight: 600;
+}
+
+/* Mobile Top App Header & Touch Filter Chips */
+.mobile-top-bar {
+  display: none;
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  background-color: var(--color-bg-elevated);
+  border-bottom: var(--border-width) var(--border-style) var(--color-border);
+  padding: calc(var(--space-unit) * 1.1 + env(safe-area-inset-top, 0px)) calc(var(--space-unit) * 1.75) calc(var(--space-unit) * 1.1);
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--space-unit) * 1);
+  box-shadow: var(--shadow-sm);
+}
+@media (max-width: 900px) {
+  .mobile-top-bar {
+    display: flex;
+  }
+}
+.mobile-filter-strip {
+  display: none;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  gap: calc(var(--space-unit) * 0.75);
+  padding: calc(var(--space-unit) * 1) calc(var(--space-unit) * 1.75);
+  background-color: var(--color-bg-primary);
+  border-bottom: var(--border-width) var(--border-style) var(--color-border);
+}
+.mobile-filter-strip::-webkit-scrollbar {
+  display: none;
+}
+@media (max-width: 900px) {
+  .mobile-filter-strip {
+    display: flex;
+  }
+}
+.mobile-chip {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  font-weight: 600;
+  background-color: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  border: var(--border-width) var(--border-style) var(--color-border);
+  cursor: pointer;
+  min-height: 36px;
+}
+.mobile-chip.active {
+  background-color: var(--color-accent);
+  color: var(--color-accent-text);
+  border-color: var(--color-accent);
+}
+
+/* Mobile Fixed Bottom Navigation Bar (iOS / Android App Ergonomics) */
+.mobile-bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 90;
+  background-color: var(--color-bg-elevated);
+  border-top: var(--border-width) var(--border-style) var(--color-border);
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+  box-shadow: var(--shadow-md);
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+}
+@media (max-width: 900px) {
+  .mobile-bottom-nav {
+    display: grid;
+  }
+}
+.mobile-tab-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  font-weight: 600;
+  min-height: 48px;
+  padding: 4px 2px;
+  cursor: pointer;
+}
+.mobile-tab-btn.active {
+  color: var(--color-accent);
+  background-color: var(--color-bg-subtle);
+}
+.mobile-tab-icon {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+/* Slide-Up Mobile Bottom Sheets (Aa Appearance, Notebook, Capture, TOC) */
+.bottom-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.55);
+  z-index: 150;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.bottom-sheet-panel {
+  width: 100%;
+  max-width: 600px;
+  max-height: 84vh;
+  overflow-y: auto;
+  background-color: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+  border: var(--border-width) var(--border-style) var(--color-border);
+  padding: calc(var(--space-unit) * 2) calc(var(--space-unit) * 2.25) calc(var(--space-unit) * 3 + env(safe-area-inset-bottom, 0px));
+  box-shadow: var(--shadow-md);
+}
+.bottom-sheet-handle {
+  width: 42px;
+  height: 5px;
+  border-radius: 999px;
+  background-color: var(--color-border);
+  margin: 0 auto calc(var(--space-unit) * 1.5);
+}
+.bottom-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: calc(var(--space-unit) * 1.75);
+  padding-bottom: calc(var(--space-unit) * 1);
+  border-bottom: var(--border-width) var(--border-style) var(--color-border);
+}
+.bottom-sheet-header h3 {
+  margin: 0;
+  font-family: var(--font-reading);
+  font-size: 1.15rem;
+}
+.sheet-control-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--space-unit) * 1.25);
+  padding: calc(var(--space-unit) * 1) 0;
+  border-bottom: var(--border-width) var(--border-style) var(--color-border);
+}
+.sheet-control-label {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+/* Main Content Region */
 .main-region {
-  padding: calc(var(--space-unit) * 3);
-  max-width: 1080px;
+  padding: calc(var(--space-unit) * 3.25) calc(var(--space-unit) * 3.75);
+  max-width: 1280px;
+  width: 100%;
+  margin: 0 auto;
+}
+@media (max-width: 900px) {
+  .main-region {
+    padding: calc(var(--space-unit) * 1.75) calc(var(--space-unit) * 1.6);
+  }
+}
+
+/* Library Header & Capture Bar */
+.library-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: calc(var(--space-unit) * 1.5);
+  margin-bottom: calc(var(--space-unit) * 2.25);
+  padding-bottom: calc(var(--space-unit) * 1.75);
+  border-bottom: var(--border-width) var(--border-style) var(--color-border);
+}
+.library-title-group h1 {
+  font-family: var(--font-reading);
+  font-size: clamp(1.5rem, 3.5vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: var(--line-height-heading);
+  margin: 0 0 calc(var(--space-unit) * 0.4) 0;
+}
+.library-subtitle {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}
+.library-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(220px, 1fr);
+  gap: calc(var(--space-unit) * 1.25);
+  margin-bottom: calc(var(--space-unit) * 2.25);
+}
+@media (max-width: 860px) {
+  .library-toolbar {
+    grid-template-columns: 1fr;
+    gap: calc(var(--space-unit) * 1);
+  }
 }
 .capture-bar {
   display: flex;
-  gap: var(--space-unit);
+  align-items: center;
+  gap: calc(var(--space-unit) * 0.85);
   background-color: var(--color-bg-elevated);
   border: var(--border-width) var(--border-style) var(--color-border);
   border-radius: var(--radius-md);
-  padding: var(--space-unit);
+  padding: calc(var(--space-unit) * 0.65) calc(var(--space-unit) * 1);
   box-shadow: var(--shadow-sm);
 }
+.capture-bar label, .search-bar label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.capture-bar input[type="url"], .search-bar input[type="search"], .form-input {
+  flex: 1;
+  min-width: 0;
+  background-color: transparent;
+  color: var(--color-text-primary);
+  border: none;
+  font-family: var(--font-ui);
+  font-size: 16px;
+  padding: calc(var(--space-unit) * 0.55) calc(var(--space-unit) * 0.65);
+}
+.capture-bar input[type="url"]:focus, .search-bar input[type="search"]:focus {
+  outline: none;
+}
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--space-unit) * 0.75);
+  background-color: var(--color-bg-elevated);
+  border: var(--border-width) var(--border-style) var(--color-border);
+  border-radius: var(--radius-md);
+  padding: calc(var(--space-unit) * 0.65) calc(var(--space-unit) * 1.15);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Touch-Friendly Buttons */
 .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--space-unit) * 0.5);
   background-color: var(--color-accent);
   color: var(--color-accent-text);
   border: var(--border-width) var(--border-style) var(--color-accent);
   border-radius: var(--radius-sm);
-  padding: calc(var(--space-unit) * 0.75) calc(var(--space-unit) * 1.5);
+  padding: calc(var(--space-unit) * 0.7) calc(var(--space-unit) * 1.35);
+  min-height: 40px;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  font-weight: 600;
   cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: opacity var(--motion-duration) var(--motion-easing);
+}
+.btn-primary:hover {
+  opacity: 0.92;
+}
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--space-unit) * 0.45);
+  background-color: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  border: var(--border-width) var(--border-style) var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: calc(var(--space-unit) * 0.55) calc(var(--space-unit) * 1);
+  min-height: 38px;
+  font-family: var(--font-ui);
+  font-size: 0.81rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: all var(--motion-duration) var(--motion-easing);
+}
+.btn-secondary:hover, .btn-secondary.active {
+  background-color: var(--color-bg-subtle);
+  color: var(--color-text-primary);
+  border-color: var(--color-accent);
+}
+
+/* Library List & Cards */
+.library-list {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-unit) * 1.35);
+}
+.library-list[data-layout="compact"] {
+  gap: calc(var(--space-unit) * 0.75);
 }
 .item-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: calc(var(--space-unit) * 2);
+  align-items: center;
   background-color: var(--color-bg-elevated);
   border: var(--border-width) var(--border-style) var(--color-border);
   border-radius: var(--radius-md);
-  padding: calc(var(--space-unit) * 1.5);
-  margin-bottom: var(--space-unit);
+  padding: calc(var(--space-unit) * 2);
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--motion-duration) var(--motion-easing),
+              box-shadow var(--motion-duration) var(--motion-easing);
 }
+.library-list[data-layout="compact"] .item-row {
+  padding: calc(var(--space-unit) * 1.2) calc(var(--space-unit) * 1.5);
+}
+.item-row:hover {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-md);
+}
+@media (max-width: 640px) {
+  .item-row {
+    grid-template-columns: 1fr;
+    gap: calc(var(--space-unit) * 1.25);
+    padding: calc(var(--space-unit) * 1.5);
+  }
+}
+.item-card-body {
+  min-width: 0;
+}
+.item-meta-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--space-unit) * 0.75);
+  margin-bottom: calc(var(--space-unit) * 0.65);
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+.domain-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  color: var(--color-accent);
+  background-color: var(--color-bg-subtle);
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+}
+.reading-time-badge {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg-primary);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  border: var(--border-width) var(--border-style) var(--color-border);
+}
+.item-row h2 {
+  margin: 0 0 calc(var(--space-unit) * 0.65) 0;
+  font-family: var(--font-reading);
+  font-size: clamp(1.14rem, 2.5vw, 1.32rem);
+  font-weight: 700;
+  line-height: 1.32;
+  letter-spacing: -0.015em;
+}
+.item-row h2 a {
+  color: var(--color-text-primary);
+  text-decoration: none;
+  cursor: pointer;
+}
+.item-row h2 a:hover {
+  color: var(--color-accent);
+}
+.item-excerpt {
+  margin: 0 0 calc(var(--space-unit) * 1.1) 0;
+  color: var(--color-text-secondary);
+  font-family: var(--font-reading);
+  font-size: 0.94rem;
+  line-height: 1.56;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.library-list[data-layout="compact"] .item-excerpt {
+  display: none;
+}
+.item-meta {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+.item-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--space-unit) * 1);
+  margin-top: calc(var(--space-unit) * 1.15);
+  padding-top: calc(var(--space-unit) * 0.95);
+  border-top: var(--border-width) var(--border-style) var(--color-border);
+}
+.item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--space-unit) * 0.55);
+}
+.item-thumbnail {
+  width: 144px;
+  height: 102px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: var(--border-width) var(--border-style) var(--color-border);
+  background-color: var(--color-bg-subtle);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+@media (max-width: 640px) {
+  .item-thumbnail {
+    width: 100%;
+    height: 176px;
+    order: -1;
+  }
+}
+.library-list[data-layout="compact"] .item-thumbnail {
+  width: 84px;
+  height: 58px;
+}
+.item-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* ==========================================================================
+   LONG-FORM READER VIEW (Desktop 3-Column + Mobile Touch Reader)
+   ========================================================================== */
+.reader-toolbar-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background-color: var(--color-bg-elevated);
+  border-bottom: var(--border-width) var(--border-style) var(--color-border);
+  padding: calc(var(--space-unit) * 0.9) calc(var(--space-unit) * 1.75);
+  margin: calc(var(--space-unit) * -3.25) calc(var(--space-unit) * -3.75) calc(var(--space-unit) * 3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--space-unit) * 1);
+  box-shadow: var(--shadow-sm);
+}
+@media (max-width: 900px) {
+  .reader-toolbar-sticky {
+    margin: calc(var(--space-unit) * -1.75) calc(var(--space-unit) * -1.6) calc(var(--space-unit) * 1.75);
+    padding: calc(var(--space-unit) * 0.75) calc(var(--space-unit) * 1.25);
+  }
+  .desktop-only-control {
+    display: none !important;
+  }
+}
+.reader-toolbar-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--space-unit) * 0.6);
+}
+.typography-control-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background-color: var(--color-bg-primary);
+  border: var(--border-width) var(--border-style) var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 3px 6px;
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+}
+.typography-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-primary);
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.typography-btn:hover, .typography-btn.active {
+  background-color: var(--color-bg-subtle);
+  color: var(--color-accent);
+}
+
+/* 3-Column Tufte / Readwise Reader Grid */
+.reader-workspace-grid {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr) 270px;
+  gap: calc(var(--space-unit) * 3.5);
+  align-items: start;
+}
+.app-shell.distraction-free .reader-workspace-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (max-width: 1180px) {
+  .reader-workspace-grid {
+    grid-template-columns: minmax(0, 1fr) 260px;
+  }
+  .reader-toc-rail {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  .reader-workspace-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .reader-marginalia-rail {
+    margin-top: calc(var(--space-unit) * 3);
+    position: static !important;
+  }
+}
+
+/* Left Rail: Sticky Table of Contents */
+.reader-toc-rail {
+  position: sticky;
+  top: calc(var(--space-unit) * 8);
+  padding-right: calc(var(--space-unit) * 1.5);
+  border-right: var(--border-width) var(--border-style) var(--color-border);
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+}
+.app-shell.distraction-free .reader-toc-rail,
+.app-shell.distraction-free .reader-marginalia-rail {
+  display: none;
+}
+.rail-heading {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  margin: 0 0 calc(var(--space-unit) * 1.15) 0;
+}
+.toc-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-unit) * 0.6);
+}
+.toc-list li a {
+  display: block;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  padding: 3px 0;
+}
+.toc-list li[data-level="2"] a {
+  padding-left: calc(var(--space-unit) * 1.15);
+  font-size: 0.79rem;
+}
+.toc-list li[data-level="3"] a {
+  padding-left: calc(var(--space-unit) * 2.1);
+  font-size: 0.76rem;
+}
+.toc-list li a:hover {
+  color: var(--color-accent);
+}
+
+/* Center Column: Long-Form Editorial Article */
 .reader-article {
   font-family: var(--font-reading);
   line-height: var(--line-height-body);
-  max-width: 68ch;
+  max-width: 65ch;
+  width: 100%;
   margin: 0 auto;
+  font-kerning: normal;
+  font-variant-ligatures: common-ligatures;
+}
+.reader-article[data-font="sans"] {
+  font-family: var(--font-ui);
+}
+.reader-article-header {
+  margin-bottom: calc(var(--space-unit) * 2.75);
+  padding-bottom: calc(var(--space-unit) * 2);
+  border-bottom: var(--border-width) var(--border-style) var(--color-border);
+}
+.reader-kicker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--space-unit) * 0.85);
+  margin-bottom: calc(var(--space-unit) * 1.1);
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+.reader-article-header h1 {
+  font-family: var(--font-reading);
+  font-size: clamp(1.6rem, 4.5vw, 2.45rem);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.022em;
+  margin: 0 0 calc(var(--space-unit) * 1.1) 0;
+  color: var(--color-text-primary);
+}
+.reader-lead-dek {
+  font-size: 1.08em;
+  line-height: 1.55;
+  color: var(--color-text-secondary);
+  margin: 0 0 calc(var(--space-unit) * 1.35) 0;
+  font-style: italic;
+}
+.reader-byline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--space-unit) * 0.85);
+  font-family: var(--font-ui);
+  font-size: 0.84rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+.reader-byline a {
+  color: var(--color-accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+/* Article Body Typography & Vertical Rhythm */
+.reader-body {
+  color: var(--color-text-primary);
+  overflow-wrap: break-word;
+}
+.reader-body p {
+  margin: 0 0 1.38em 0;
+}
+.reader-body > p:first-of-type::first-letter {
+  font-family: var(--font-reading);
+  font-size: 2.95em;
+  float: left;
+  line-height: 0.86;
+  padding-right: 0.12em;
+  padding-top: 0.04em;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+.reader-body h1,
+.reader-body h2,
+.reader-body h3,
+.reader-body h4 {
+  font-family: var(--font-reading);
+  color: var(--color-text-primary);
+  line-height: var(--line-height-heading);
+  letter-spacing: -0.015em;
+  margin-top: 2em;
+  margin-bottom: 0.65em;
+  scroll-margin-top: 84px;
+}
+.reader-body h2 {
+  font-size: 1.38em;
+  padding-bottom: 0.25em;
+  border-bottom: var(--border-width) var(--border-style) var(--color-border);
+}
+.reader-body h3 {
+  font-size: 1.18em;
+}
+.reader-body a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.reader-body blockquote {
+  margin: 1.65em 0;
+  padding: calc(var(--space-unit) * 1.35) calc(var(--space-unit) * 1.85);
+  border-left: 4px solid var(--color-accent);
+  background-color: var(--color-bg-elevated);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  font-style: italic;
+  color: var(--color-text-secondary);
+  box-shadow: var(--shadow-sm);
+}
+.reader-hero-figure,
+.reader-body figure {
+  margin: 2em 0;
+  padding: calc(var(--space-unit) * 1.1);
+  background-color: var(--color-bg-elevated);
+  border: var(--border-width) var(--border-style) var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  text-align: center;
+}
+.reader-hero-figure img,
+.reader-body figure img,
+.reader-body img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: var(--radius-sm);
+  cursor: zoom-in;
+  background-color: var(--color-bg-subtle);
+}
+.reader-hero-figure figcaption,
+.reader-body figure figcaption,
+.reader-body figcaption {
+  margin-top: calc(var(--space-unit) * 0.85);
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+  text-align: left;
+}
+.reader-body pre {
+  background-color: var(--color-bg-elevated);
+  border: var(--border-width) var(--border-style) var(--color-border);
+  border-radius: var(--radius-md);
+  padding: calc(var(--space-unit) * 1.35);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  line-height: 1.55;
+  margin: 1.5em 0;
+}
+.reader-body code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background-color: var(--color-bg-subtle);
+  padding: 0.14em 0.35em;
+  border-radius: var(--radius-sm);
+}
+.reader-body pre code {
+  background: transparent;
+  padding: 0;
+}
+.reader-body table {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-collapse: collapse;
+  margin: 1.6em 0;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+}
+.reader-body th,
+.reader-body td {
+  padding: calc(var(--space-unit) * 0.75) calc(var(--space-unit) * 0.9);
+  border-bottom: var(--border-width) var(--border-style) var(--color-border);
+  text-align: left;
+}
+.reader-body th {
+  font-weight: 700;
+  border-top: 2px solid var(--color-text-primary);
+  border-bottom: 2px solid var(--color-text-primary);
 }
 .reader-article mark {
   background-color: var(--color-highlight-bg);
   color: var(--color-highlight-text);
+  padding: 0.08em 0.22em;
+  border-radius: 3px;
 }
+
+/* Right Rail: Marginalia, Highlights & Notes */
+.reader-marginalia-rail {
+  position: sticky;
+  top: calc(var(--space-unit) * 8);
+  background-color: var(--color-bg-elevated);
+  border: var(--border-width) var(--border-style) var(--color-border);
+  border-radius: var(--radius-md);
+  padding: calc(var(--space-unit) * 1.65);
+  box-shadow: var(--shadow-sm);
+}
+.annotation-composer {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-unit) * 0.8);
+  margin-bottom: calc(var(--space-unit) * 1.75);
+  padding-bottom: calc(var(--space-unit) * 1.35);
+  border-bottom: var(--border-width) var(--border-style) var(--color-border);
+}
+.annotation-composer input[type="text"] {
+  width: 100%;
+  padding: calc(var(--space-unit) * 0.65) calc(var(--space-unit) * 0.85);
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  border: var(--border-width) var(--border-style) var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: 16px;
+}
+.annotation-list {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-unit) * 0.9);
+}
+.annotation-card {
+  background-color: var(--color-bg-primary);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  padding: calc(var(--space-unit) * 0.95);
+  font-size: 0.82rem;
+}
+.annotation-quote {
+  font-family: var(--font-reading);
+  font-style: italic;
+  color: var(--color-text-primary);
+  margin: 0 0 calc(var(--space-unit) * 0.45) 0;
+}
+.annotation-note {
+  color: var(--color-text-secondary);
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+/* Toast Notification Banner */
+.react-toast-banner {
+  position: fixed;
+  bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+  right: 20px;
+  z-index: 180;
+  background-color: var(--color-accent);
+  color: var(--color-accent-text);
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+/* Image Lightbox Modal */
+.image-lightbox {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.86);
+  z-index: 200;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--space-unit) * 2);
+  cursor: zoom-out;
+}
+.image-lightbox.open {
+  display: flex;
+}
+.image-lightbox img {
+  max-width: 95vw;
+  max-height: 88vh;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  background-color: var(--color-bg-elevated);
+}
+
+/* Command Palette, Settings, and Error Banner */
 .command-palette-dialog {
   background-color: var(--color-bg-elevated);
   color: var(--color-text-primary);
   border: var(--border-width) var(--border-style) var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
-  padding: calc(var(--space-unit) * 2);
+  padding: calc(var(--space-unit) * 2.25);
+  max-width: 640px;
+  margin: calc(var(--space-unit) * 2) auto;
+}
+.command-palette-dialog input[type="text"] {
+  width: 100%;
+  padding: calc(var(--space-unit) * 0.9);
+  margin: calc(var(--space-unit) * 0.85) 0 calc(var(--space-unit) * 1.35);
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  border: var(--border-width) var(--border-style) var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 16px;
+}
+.command-palette-dialog ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.command-palette-dialog li {
+  padding: calc(var(--space-unit) * 0.85) calc(var(--space-unit) * 1.1);
+  border-radius: var(--radius-sm);
+  border: var(--border-width) var(--border-style) var(--color-border);
+  background-color: var(--color-bg-primary);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.command-palette-dialog li:hover, .command-palette-dialog li[aria-selected="true"] {
+  border-color: var(--color-accent);
+  background-color: var(--color-bg-subtle);
+}
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: calc(var(--space-unit) * 1.25);
+  margin: calc(var(--space-unit) * 1.25) 0 calc(var(--space-unit) * 2.25);
+}
+.theme-card-option {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--space-unit) * 1);
+  padding: calc(var(--space-unit) * 1.35);
+  background-color: var(--color-bg-elevated);
+  border: var(--border-width) var(--border-style) var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
 }
 .error-banner {
   background-color: var(--color-bg-subtle);
   color: var(--color-danger);
   border: var(--border-width) var(--border-style) var(--color-danger);
   border-radius: var(--radius-md);
-  padding: calc(var(--space-unit) * 1.5);
+  padding: calc(var(--space-unit) * 2);
 }
 </style>
 </head>
 <body>
-  <div class="app-shell">
-    <nav class="sidebar" aria-label="Primary Navigation">
-      <a href="/?view=inbox">Inbox</a>
-      <a href="/?view=all">All Items</a>
-      <a href="/?view=unread">Unread</a>
-      <a href="/?view=favorites">Favorites</a>
-      <a href="/?view=archived">Archived</a>
-      <a href="/?view=failed">Failed</a>
-      <a href="/?screen=settings">Settings</a>
-    </nav>
-    <main class="main-region" id="main-content">
-      
+  <div id="react-root">
+    <div class="reading-progress-track" aria-hidden="true">
+      <div class="reading-progress-fill" id="reading-progress-bar"></div>
+    </div>
+
+    <header class="mobile-top-bar" aria-label="Mobile App Bar">
+      <a href="/?view=all&theme=editorial-light" class="brand-title" data-spa-screen="library">
+        <span class="brand-mark">F</span>
+        <span>Folio</span>
+      </a>
+      <div class="item-actions">
+        <button type="button" class="btn-secondary" data-open-sheet="capture">+ Save URL</button>
+        <button type="button" class="btn-secondary" data-open-sheet="typography">Aa</button>
+      </div>
+    </header>
+
+    <div class="app-shell " id="app-shell-container">
+      <nav class="sidebar" aria-label="Primary Navigation">
+        <div>
+          <div class="brand-header">
+            <a href="/?view=all&theme=editorial-light" class="brand-title" data-spa-screen="library">
+              <span class="brand-mark">F</span>
+              <span>Folio Reader</span>
+            </a>
+            <a href="/?screen=command-palette&theme=editorial-light" class="kbd-shortcut" data-spa-screen="command-palette" title="Open Command Palette">⌘K</a>
+          </div>
+
+          <div class="nav-section-label">Reading Queue</div>
+          <div class="nav-list">
+            <a href="/?view=all&theme=editorial-light" class="nav-link " data-spa-view="all">
+              <span>All Essays</span>
+              <span class="nav-count">0</span>
+            </a>
+            <a href="/?view=inbox&theme=editorial-light" class="nav-link " data-spa-view="inbox">
+              <span>Inbox</span>
+            </a>
+            <a href="/?view=unread&theme=editorial-light" class="nav-link " data-spa-view="unread">
+              <span>Unread</span>
+            </a>
+            <a href="/?view=favorites&theme=editorial-light" class="nav-link " data-spa-view="favorites">
+              <span>Starred ★</span>
+            </a>
+            <a href="/?view=archived&theme=editorial-light" class="nav-link " data-spa-view="archived">
+              <span>Archive</span>
+            </a>
+            <a href="/?view=failed&theme=editorial-light" class="nav-link " data-spa-view="failed">
+              <span>Failed</span>
+            </a>
+          </div>
+
+          <div class="nav-section-label">Workspace</div>
+          <div class="nav-list">
+            <a href="/?screen=settings&theme=editorial-light" class="nav-link " data-spa-screen="settings">
+              <span>Themes &amp; Typography</span>
+            </a>
+            <a href="/?screen=command-palette&theme=editorial-light" class="nav-link active" data-spa-screen="command-palette">
+              <span>Command Palette</span>
+            </a>
+          </div>
+        </div>
+
+        <div class="sidebar-footer">
+          <div class="nav-section-label" style="margin-top:0">Paper &amp; Contrast</div>
+          <div class="theme-pills" role="group" aria-label="Quick Theme Switcher">
+            <button type="button" class="theme-pill-btn active" data-quick-theme="editorial-light">Ivory Light</button>
+            <button type="button" class="theme-pill-btn " data-quick-theme="soft-sepia">Warm Sepia</button>
+            <button type="button" class="theme-pill-btn " data-quick-theme="swiss-minimal">Swiss Crisp</button>
+            <button type="button" class="theme-pill-btn " data-quick-theme="midnight-amoled">AMOLED Dark</button>
+          </div>
+        </div>
+      </nav>
+      <main class="main-region" id="main-content">
+        
       <div role="dialog" aria-modal="true" aria-labelledby="cmd-palette-title" class="command-palette-dialog" tabindex="-1">
         <h1 id="cmd-palette-title">Command Palette (Cmd+K / Ctrl+K)</h1>
         <label for="cmd-input">Run a command</label>
         <input id="cmd-input" type="text" placeholder="Type a command or search..." autofocus />
         <ul role="listbox" aria-label="Available Commands">
-          <li role="option" aria-selected="true" data-cmd="capture">Save URL</li>
-          <li role="option" aria-selected="false" data-cmd="search">Search Library</li>
-          <li role="option" aria-selected="false" data-cmd="switch-theme">Switch Theme</li>
-          <li role="option" aria-selected="false" data-cmd="create-collection">Create Collection</li>
-          <li role="option" aria-selected="false" data-cmd="mark-read">Mark Read / Unread</li>
-          <li role="option" aria-selected="false" data-cmd="favorite">Toggle Favorite</li>
-          <li role="option" aria-selected="false" data-cmd="archive">Archive Item</li>
-          <li role="option" aria-selected="false" data-cmd="export">Export Library</li>
+          <li role="option" aria-selected="true" data-cmd="capture"><span>Save URL to Library</span><span class="kbd-shortcut">C</span></li>
+          <li role="option" aria-selected="false" data-cmd="search"><span>Search Full-Text Knowledge Base</span><span class="kbd-shortcut">/</span></li>
+          <li role="option" aria-selected="false" data-cmd="switch-theme"><span>Switch Reading Theme</span><span class="kbd-shortcut">T</span></li>
+          <li role="option" aria-selected="false" data-cmd="create-collection"><span>Create Collection</span><span class="kbd-shortcut">N</span></li>
+          <li role="option" aria-selected="false" data-cmd="mark-read"><span>Mark Read / Unread</span><span class="kbd-shortcut">M</span></li>
+          <li role="option" aria-selected="false" data-cmd="favorite"><span>Toggle Starred Favorite</span><span class="kbd-shortcut">S</span></li>
+          <li role="option" aria-selected="false" data-cmd="archive"><span>Archive Item</span><span class="kbd-shortcut">E</span></li>
+          <li role="option" aria-selected="false" data-cmd="export"><span>Export Portable ZIP / JSON Archive</span><span class="kbd-shortcut">X</span></li>
         </ul>
       </div>
-    </main>
+      </main>
+    </div>
   </div>
+
+  <script id="folio-initial-state" type="application/json">{"screen":"command-palette","theme":"editorial-light","view":"all","listLayout":"comfortable","readerSettings":{"width":"medium","fontSize":19,"fontFamily":"serif","lineSpacing":1.75,"distractionFree":false},"allItems":[],"itemStates":{},"activeItemId":null,"revisionsByItemId":{},"annotationsByItemId":{}}</script>
+  <script id="interactive-app-script">
+  (function() {
+    // Self-contained React 18-style Component & Hooks Runtime (VDOM + useState + useEffect + useMemo + createRoot)
+    var currentHookIndex = 0;
+    var currentComponentHooks = [];
+    var rootRenderScheduled = false;
+    var activeRootInstance = null;
+
+    function createElement(type, props) {
+      var children = [];
+      for (var i = 2; i < arguments.length; i++) {
+        var child = arguments[i];
+        if (Array.isArray(child)) {
+          for (var j = 0; j < child.length; j++) children.push(child[j]);
+        } else {
+          children.push(child);
+        }
+      }
+      return { type: type, props: Object.assign({}, props || {}, { children: children }) };
+    }
+
+    function useState(initialValue) {
+      var idx = currentHookIndex++;
+      if (currentComponentHooks.length <= idx) {
+        currentComponentHooks.push(typeof initialValue === "function" ? initialValue() : initialValue);
+      }
+      var stateVal = currentComponentHooks[idx];
+      var setState = function(updater) {
+        var nextVal = typeof updater === "function" ? updater(currentComponentHooks[idx]) : updater;
+        if (nextVal !== currentComponentHooks[idx]) {
+          currentComponentHooks[idx] = nextVal;
+          scheduleReconcile();
+        }
+      };
+      return [stateVal, setState];
+    }
+
+    function useMemo(factory, deps) {
+      var idx = currentHookIndex++;
+      var prev = currentComponentHooks[idx];
+      if (!prev || !deps || prev.deps.length !== deps.length || prev.deps.some(function(d, i) { return d !== deps[i]; })) {
+        var val = factory();
+        currentComponentHooks[idx] = { val: val, deps: deps };
+        return val;
+      }
+      return prev.val;
+    }
+
+    function renderVNodeToDom(vnode) {
+      if (vnode === null || vnode === undefined || vnode === false || vnode === true) {
+        return document.createTextNode("");
+      }
+      if (typeof vnode === "string" || typeof vnode === "number") {
+        return document.createTextNode(String(vnode));
+      }
+      if (typeof vnode.type === "function") {
+        return renderVNodeToDom(vnode.type(vnode.props));
+      }
+      var el = document.createElement(vnode.type);
+      var props = vnode.props || {};
+      Object.keys(props).forEach(function(k) {
+        if (k === "children" || k === "key") return;
+        var val = props[k];
+        if (val === undefined || val === null || val === false) return;
+        if (k === "className") {
+          el.className = val;
+        } else if (k === "style" && typeof val === "object") {
+          Object.assign(el.style, val);
+        } else if (k === "dangerouslySetInnerHTML" && val && typeof val.__html === "string") {
+          el.innerHTML = val.__html;
+        } else if (k.startsWith("on") && typeof val === "function") {
+          var evt = k.slice(2).toLowerCase();
+          el.addEventListener(evt, val);
+        } else if (k === "checked" || k === "value" || k === "disabled" || k === "required" || k === "autofocus") {
+          el[k] = val;
+          if (k === "value") el.setAttribute("value", String(val));
+        } else {
+          el.setAttribute(k, val === true ? "" : String(val));
+        }
+      });
+      if (!props.dangerouslySetInnerHTML && Array.isArray(props.children)) {
+        props.children.forEach(function(c) {
+          el.appendChild(renderVNodeToDom(c));
+        });
+      }
+      return el;
+    }
+
+    function scheduleReconcile() {
+      if (rootRenderScheduled || !activeRootInstance) return;
+      rootRenderScheduled = true;
+      requestAnimationFrame(function() {
+        rootRenderScheduled = false;
+        if (activeRootInstance) activeRootInstance.renderNow();
+      });
+    }
+
+    var ReactRuntime = {
+      createElement: createElement,
+      useState: useState,
+      useMemo: useMemo,
+      createRoot: function(container) {
+        var rootComp = null;
+        var instance = {
+          render: function(comp) {
+            rootComp = comp;
+            instance.renderNow();
+          },
+          renderNow: function() {
+            if (!rootComp || !container) return;
+            currentHookIndex = 0;
+            var vtree = typeof rootComp.type === "function" ? rootComp.type(rootComp.props) : rootComp;
+            var dom = renderVNodeToDom(vtree);
+            container.innerHTML = "";
+            container.appendChild(dom);
+          }
+        };
+        activeRootInstance = instance;
+        return instance;
+      }
+    };
+
+    window.React = ReactRuntime;
+    window.ReactDOM = ReactRuntime;
+
+    var h = ReactRuntime.createElement;
+
+    function FolioReactApp(props) {
+      var init = props.initialState;
+      var _screen = useState(init.screen || "library");
+      var screen = _screen[0], setScreen = _screen[1];
+
+      var _view = useState(init.view || "all");
+      var view = _view[0], setView = _view[1];
+
+      var _theme = useState(init.theme || "editorial-light");
+      var theme = _theme[0], setTheme = _theme[1];
+
+      var _listLayout = useState(init.listLayout || "comfortable");
+      var listLayout = _listLayout[0], setListLayout = _listLayout[1];
+
+      var _readerSettings = useState(init.readerSettings || {
+        width: "medium",
+        fontSize: 19,
+        fontFamily: "serif",
+        lineSpacing: 1.75,
+        distractionFree: false
+      });
+      var readerSettings = _readerSettings[0], setReaderSettings = _readerSettings[1];
+
+      var _items = useState(init.allItems || []);
+      var allItems = _items[0], setAllItems = _items[1];
+
+      var _itemStates = useState(init.itemStates || {});
+      var itemStates = _itemStates[0], setItemStates = _itemStates[1];
+
+      var _activeItemId = useState(init.activeItemId || (init.allItems && init.allItems[0] ? init.allItems[0].id : null));
+      var activeItemId = _activeItemId[0], setActiveItemId = _activeItemId[1];
+
+      var _revisions = useState(init.revisionsByItemId || {});
+      var revisions = _revisions[0], setRevisions = _revisions[1];
+
+      var _annotations = useState(init.annotationsByItemId || {});
+      var annotationsByItem = _annotations[0], setAnnotationsByItem = _annotations[1];
+
+      var _searchQuery = useState("");
+      var searchQuery = _searchQuery[0], setSearchQuery = _searchQuery[1];
+
+      var _captureUrl = useState("");
+      var captureUrl = _captureUrl[0], setCaptureUrl = _captureUrl[1];
+
+      var _capturing = useState(false);
+      var capturing = _capturing[0], setCapturing = _capturing[1];
+
+      var _activeSheet = useState(null); // "typography" | "capture" | "notebook" | "toc" | null
+      var activeSheet = _activeSheet[0], setActiveSheet = _activeSheet[1];
+
+      var _lightboxSrc = useState(null);
+      var lightboxSrc = _lightboxSrc[0], setLightboxSrc = _lightboxSrc[1];
+
+      var _toast = useState(null);
+      var toast = _toast[0], setToast = _toast[1];
+
+      var _quoteDraft = useState("");
+      var quoteDraft = _quoteDraft[0], setQuoteDraft = _quoteDraft[1];
+
+      var _noteDraft = useState("");
+      var noteDraft = _noteDraft[0], setNoteDraft = _noteDraft[1];
+
+      var showToast = function(msg) {
+        setToast(msg);
+        setTimeout(function() { setToast(null); }, 2800);
+      };
+
+      var switchTheme = function(nextTheme) {
+        var resolved = nextTheme === "system"
+          ? (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "midnight-amoled" : "editorial-light")
+          : nextTheme;
+        setTheme(resolved);
+        try { localStorage.setItem("rp_theme", nextTheme); } catch (e) {}
+        document.documentElement.setAttribute("data-theme", resolved);
+        fetch("/api/user/settings", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ theme: nextTheme })
+        }).catch(function() {});
+      };
+
+      var updateReaderSetting = function(patch) {
+        var next = Object.assign({}, readerSettings, patch);
+        setReaderSettings(next);
+        fetch("/api/user/settings", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reader: patch })
+        }).catch(function() {});
+      };
+
+      var navigateToView = function(nextView) {
+        setView(nextView);
+        setScreen("library");
+        setActiveSheet(null);
+        try { window.history.pushState({}, "", "/?view=" + encodeURIComponent(nextView) + "&theme=" + encodeURIComponent(theme)); } catch (e) {}
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      };
+
+      var openReaderForItem = function(itemId) {
+        setActiveItemId(itemId);
+        setScreen("reader");
+        setActiveSheet(null);
+        try { window.history.pushState({}, "", "/?screen=reader&id=" + encodeURIComponent(itemId) + "&theme=" + encodeURIComponent(theme)); } catch (e) {}
+        window.scrollTo({ top: 0, behavior: "instant" });
+
+        if (!revisions[itemId]) {
+          fetch("/api/items/" + encodeURIComponent(itemId))
+            .then(function(r) { return r.ok ? r.json() : null; })
+            .then(function(data) {
+              if (data && data.revision) {
+                var nextRevs = Object.assign({}, revisions);
+                nextRevs[itemId] = { sanitized_html: data.revision.sanitized_html, toc: data.revision.toc || [] };
+                setRevisions(nextRevs);
+              }
+              if (data && data.annotations) {
+                var nextAnns = Object.assign({}, annotationsByItem);
+                nextAnns[itemId] = data.annotations;
+                setAnnotationsByItem(nextAnns);
+              }
+            })
+            .catch(function() {});
+        }
+      };
+
+      var mutateItemState = function(itemId, patch, toastMsg) {
+        var prev = itemStates[itemId] || { is_read: false, is_favorite: false, lifecycle: "active", progress_percent: 0 };
+        var nextState = Object.assign({}, prev, patch);
+        var nextMap = Object.assign({}, itemStates);
+        nextMap[itemId] = nextState;
+        setItemStates(nextMap);
+        if (toastMsg) showToast(toastMsg);
+
+        fetch("/api/items/" + encodeURIComponent(itemId) + "/state", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch)
+        }).catch(function() {});
+      };
+
+      var submitCaptureUrl = function(e) {
+        if (e && e.preventDefault) e.preventDefault();
+        var raw = (captureUrl || "").trim();
+        if (!raw) return;
+        setCapturing(true);
+        showToast("Capturing article & extracting figures...");
+        fetch("/api/items/capture", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: raw })
+        })
+          .then(function(r) { return r.json().then(function(b) { return { ok: r.ok, body: b }; }); })
+          .then(function(res) {
+            setCapturing(false);
+            if (!res.ok) {
+              showToast(res.body.error || "Could not save URL");
+              return;
+            }
+            var capturedItem = res.body.item;
+            setCaptureUrl("");
+            setActiveSheet(null);
+            if (capturedItem) {
+              var exists = allItems.some(function(i) { return i.id === capturedItem.id; });
+              if (!exists) {
+                setAllItems([capturedItem].concat(allItems));
+              }
+              // Poll once after embedded worker extracts the article & images
+              setTimeout(function() {
+                fetch("/api/items/" + encodeURIComponent(capturedItem.id))
+                  .then(function(pr) { return pr.ok ? pr.json() : null; })
+                  .then(function(detail) {
+                    if (!detail || !detail.item) return;
+                    setAllItems(function(curr) {
+                      var found = curr.some(function(x) { return x.id === detail.item.id; });
+                      return found
+                        ? curr.map(function(x) { return x.id === detail.item.id ? detail.item : x; })
+                        : [detail.item].concat(curr);
+                    });
+                    if (detail.revision) {
+                      setRevisions(function(currRev) {
+                        var copy = Object.assign({}, currRev);
+                        copy[detail.item.id] = { sanitized_html: detail.revision.sanitized_html, toc: detail.revision.toc || [] };
+                        return copy;
+                      });
+                    }
+                    showToast("Ready to read: " + detail.item.title);
+                  })
+                  .catch(function() {});
+              }, 1600);
+            }
+          })
+          .catch(function() {
+            setCapturing(false);
+            showToast("Network error while saving URL");
+          });
+      };
+
+      var submitHighlight = function(e) {
+        if (e && e.preventDefault) e.preventDefault();
+        if (!activeItemId || !quoteDraft.trim()) return;
+        var q = quoteDraft.trim();
+        var n = noteDraft.trim();
+        fetch("/api/items/" + encodeURIComponent(activeItemId) + "/annotations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "highlight", exactQuote: q, note: n, color: "yellow" })
+        })
+          .then(function(r) { return r.ok ? r.json() : null; })
+          .then(function(data) {
+            if (data && data.annotation) {
+              var existing = annotationsByItem[activeItemId] || [];
+              var nextMap = Object.assign({}, annotationsByItem);
+              nextMap[activeItemId] = [data.annotation].concat(existing);
+              setAnnotationsByItem(nextMap);
+              setQuoteDraft("");
+              setNoteDraft("");
+              showToast("Highlight saved to Notebook");
+            }
+          })
+          .catch(function() {});
+      };
+
+      var filteredItems = useMemo(function() {
+        var q = searchQuery.toLowerCase().trim();
+        return allItems.filter(function(i) {
+          var st = itemStates[i.id] || { is_read: false, is_favorite: false, lifecycle: "active" };
+          if (st.lifecycle === "trashed") return false;
+          if (view === "inbox" || view === "unread") {
+            if (st.is_read || st.lifecycle !== "active") return false;
+          } else if (view === "favorites") {
+            if (!st.is_favorite) return false;
+          } else if (view === "archived") {
+            if (st.lifecycle !== "archived") return false;
+          } else if (view === "failed") {
+            if (i.processing_status !== "failed") return false;
+          }
+          if (q) {
+            var hay = ((i.title || "") + " " + (i.author || "") + " " + (i.domain || "") + " " + (i.description || "")).toLowerCase();
+            if (!hay.includes(q)) return false;
+          }
+          return true;
+        });
+      }, [allItems, itemStates, view, searchQuery]);
+
+      var activeItem = useMemo(function() {
+        return allItems.find(function(i) { return i.id === activeItemId; }) || allItems[0] || null;
+      }, [allItems, activeItemId]);
+
+      var activeRev = activeItem ? revisions[activeItem.id] : null;
+      var activeAnnotations = activeItem ? (annotationsByItem[activeItem.id] || []) : [];
+      var widthCh = readerSettings.width === "narrow" ? "55ch" : readerSettings.width === "wide" ? "78ch" : "65ch";
+      var isDistractionFree = Boolean(readerSettings.distractionFree && screen === "reader");
+
+      // Render main screen view inside React VDOM
+      var mainViewNode = null;
+      if (screen === "library") {
+        var viewTitles = {
+          all: ["Library", "Calm, mobile-optimized reading queue engineered for long-form focus."],
+          inbox: ["Inbox", "Newly captured essays awaiting your first reading session."],
+          unread: ["Unread Queue", "Articles in progress or queued for deep reading."],
+          favorites: ["Starred Essays", "Foundational essays and reference articles marked as favorites."],
+          archived: ["Archive", "Completed readings preserved in your searchable knowledge base."],
+          failed: ["Failed Captures", "URLs that timed out or were blocked during extraction."]
+        };
+        var vt = viewTitles[view] || viewTitles.all;
+
+        mainViewNode = h("section", { "aria-labelledby": "library-heading" },
+          h("header", { className: "library-header" },
+            h("div", { className: "library-title-group" },
+              h("h1", { id: "library-heading" }, vt[0]),
+              h("p", { className: "library-subtitle" }, vt[1])
+            ),
+            h("div", { className: "item-actions" },
+              h("button", {
+                type: "button",
+                className: "btn-secondary " + (listLayout === "comfortable" ? "active" : ""),
+                onClick: function() { setListLayout("comfortable"); }
+              }, "Comfortable"),
+              h("button", {
+                type: "button",
+                className: "btn-secondary " + (listLayout === "compact" ? "active" : ""),
+                onClick: function() { setListLayout("compact"); }
+              }, "Compact")
+            )
+          ),
+          h("div", { className: "library-toolbar" },
+            h("form", { className: "capture-bar", onSubmit: submitCaptureUrl, "aria-label": "Save URL to Library" },
+              h("label", { for: "capture-url-input" }, "Save URL"),
+              h("input", {
+                id: "capture-url-input",
+                name: "url",
+                type: "url",
+                required: true,
+                value: captureUrl,
+                placeholder: "https://paulgraham.com/greatwork.html or any article URL...",
+                onInput: function(e) { setCaptureUrl(e.target.value); }
+              }),
+              h("button", { type: "submit", className: "btn-primary" }, capturing ? "Saving..." : "Save Article")
+            ),
+            h("div", { className: "search-bar", role: "search" },
+              h("label", { for: "library-search-input" }, "Filter"),
+              h("input", {
+                id: "library-search-input",
+                type: "search",
+                value: searchQuery,
+                placeholder: "Search title, author, domain...",
+                onInput: function(e) { setSearchQuery(e.target.value); }
+              })
+            )
+          ),
+          h("div", { className: "library-list", id: "library-list-container", "data-layout": listLayout },
+            filteredItems.length === 0
+              ? h("p", { role: "status" }, "No matching articles in this view. Tap + Save to capture an article.")
+              : filteredItems.map(function(it) {
+                  var st = itemStates[it.id] || {};
+                  var isFav = Boolean(st.is_favorite);
+                  var isRead = Boolean(st.is_read);
+                  var isArch = st.lifecycle === "archived";
+                  var pubDate = (it.published_at || it.created_at || "").slice(0, 10);
+
+                  return h("article", { className: "item-row", key: it.id, "data-item-id": it.id },
+                    h("div", { className: "item-card-body" },
+                      h("div", { className: "item-meta-top" },
+                        h("span", { className: "domain-pill" }, it.publisher || it.domain),
+                        it.author ? h("span", null, "by ", h("strong", null, it.author)) : null,
+                        pubDate ? h("span", null, "· " + pubDate) : null,
+                        h("span", { className: "reading-time-badge" }, String(it.reading_time_minutes || 5) + " min read")
+                      ),
+                      h("h2", null,
+                        h("a", {
+                          href: "/?screen=reader&id=" + encodeURIComponent(it.id),
+                          onClick: function(e) { e.preventDefault(); openReaderForItem(it.id); }
+                        }, it.title)
+                      ),
+                      it.description ? h("p", { className: "item-excerpt" }, it.description) : null,
+                      h("p", { className: "item-meta" }, it.domain + " · " + String(it.reading_time_minutes || 5) + " min read · status: " + it.processing_status),
+                      h("div", { className: "item-card-footer" },
+                        h("div", { className: "item-actions" },
+                          h("button", {
+                            type: "button",
+                            className: "btn-primary",
+                            onClick: function() { openReaderForItem(it.id); }
+                          }, "Read Essay →"),
+                          h("button", {
+                            type: "button",
+                            className: "btn-secondary " + (isFav ? "active" : ""),
+                            onClick: function() { mutateItemState(it.id, { is_favorite: !isFav }, !isFav ? "Added to Starred ★" : "Removed from Starred"); }
+                          }, isFav ? "★ Starred" : "☆ Star"),
+                          h("button", {
+                            type: "button",
+                            className: "btn-secondary " + (isRead ? "active" : ""),
+                            onClick: function() { mutateItemState(it.id, { is_read: !isRead, progress_percent: !isRead ? 100 : 0 }, !isRead ? "Marked as Read ✓" : "Marked Unread"); }
+                          }, isRead ? "✓ Read" : "Mark Read"),
+                          h("button", {
+                            type: "button",
+                            className: "btn-secondary",
+                            onClick: function() { mutateItemState(it.id, { lifecycle: isArch ? "active" : "archived" }, isArch ? "Restored to Queue" : "Archived"); }
+                          }, isArch ? "Unarchive" : "Archive")
+                        )
+                      )
+                    ),
+                    it.featured_image
+                      ? h("a", {
+                          href: "/?screen=reader&id=" + encodeURIComponent(it.id),
+                          className: "item-thumbnail",
+                          "aria-label": "Read " + it.title,
+                          onClick: function(e) { e.preventDefault(); openReaderForItem(it.id); }
+                        },
+                        h("img", {
+                          src: it.featured_image,
+                          alt: it.title,
+                          loading: "lazy",
+                          decoding: "async",
+                          onError: function(e) { e.target.style.display = "none"; }
+                        })
+                      )
+                      : null
+                  );
+                })
+          )
+        );
+      } else if (screen === "reader") {
+        var bodyHtml = (activeRev && activeRev.sanitized_html) || "<p>Loading article content...</p>";
+        var tocList = (activeRev && activeRev.toc) || [];
+        var showHero = activeItem && activeItem.featured_image && !bodyHtml.includes(activeItem.featured_image);
+
+        mainViewNode = h("div", null,
+          h("div", { className: "reader-toolbar-sticky", role: "toolbar", "aria-label": "Reader Typography and Appearance Controls" },
+            h("div", { className: "reader-toolbar-group" },
+              h("button", {
+                type: "button",
+                className: "btn-secondary",
+                onClick: function() { setScreen("library"); }
+              }, "← Library"),
+              h("span", { className: "reading-time-badge" }, String((activeItem && activeItem.reading_time_minutes) || 5) + " min read")
+            ),
+            h("div", { className: "reader-toolbar-group" },
+              h("div", { className: "typography-control-pill", role: "group", "aria-label": "Font Family" },
+                h("button", {
+                  type: "button",
+                  className: "typography-btn " + (readerSettings.fontFamily === "serif" ? "active" : ""),
+                  onClick: function() { updateReaderSetting({ fontFamily: "serif" }); }
+                }, "Serif"),
+                h("button", {
+                  type: "button",
+                  className: "typography-btn " + (readerSettings.fontFamily === "sans" ? "active" : ""),
+                  onClick: function() { updateReaderSetting({ fontFamily: "sans" }); }
+                }, "Sans")
+              ),
+              h("div", { className: "typography-control-pill", role: "group", "aria-label": "Font Size" },
+                h("button", {
+                  type: "button",
+                  className: "typography-btn",
+                  onClick: function() { updateReaderSetting({ fontSize: Math.max(15, readerSettings.fontSize - 1) }); }
+                }, "A−"),
+                h("span", { id: "reader-size-label" }, String(readerSettings.fontSize) + "px"),
+                h("button", {
+                  type: "button",
+                  className: "typography-btn",
+                  onClick: function() { updateReaderSetting({ fontSize: Math.min(26, readerSettings.fontSize + 1) }); }
+                }, "A+")
+              ),
+              h("div", { className: "typography-control-pill desktop-only-control", role: "group", "aria-label": "Column Measure" },
+                h("button", {
+                  type: "button",
+                  className: "typography-btn " + (readerSettings.width === "narrow" ? "active" : ""),
+                  onClick: function() { updateReaderSetting({ width: "narrow" }); }
+                }, "55ch"),
+                h("button", {
+                  type: "button",
+                  className: "typography-btn " + (readerSettings.width === "medium" ? "active" : ""),
+                  onClick: function() { updateReaderSetting({ width: "medium" }); }
+                }, "65ch"),
+                h("button", {
+                  type: "button",
+                  className: "typography-btn " + (readerSettings.width === "wide" ? "active" : ""),
+                  onClick: function() { updateReaderSetting({ width: "wide" }); }
+                }, "78ch")
+              ),
+              h("button", {
+                type: "button",
+                className: "btn-secondary " + (readerSettings.distractionFree ? "active" : ""),
+                id: "zen-mode-toggle",
+                onClick: function() { updateReaderSetting({ distractionFree: !readerSettings.distractionFree }); }
+              }, readerSettings.distractionFree ? "Exit Focus" : "Focus (F)")
+            )
+          ),
+
+          h("div", { className: "reader-workspace-grid" },
+            h("aside", { className: "reader-toc-rail", "aria-label": "Article Outline" },
+              h("h2", { className: "rail-heading" }, "Contents"),
+              h("nav", { "aria-label": "Table of Contents" },
+                h("ul", { className: "toc-list" },
+                  tocList.length === 0
+                    ? h("li", null, h("a", { href: "#reader-title" }, "Top of Essay"))
+                    : tocList.map(function(t) {
+                        return h("li", { key: t.id, "data-level": t.level },
+                          h("a", { href: "#" + t.id }, t.text)
+                        );
+                      })
+                )
+              )
+            ),
+
+            h("article", {
+              className: "reader-article",
+              id: "reader-article-canvas",
+              "data-item-id": (activeItem && activeItem.id) || "",
+              "data-font": readerSettings.fontFamily,
+              "aria-labelledby": "reader-title",
+              style: {
+                maxWidth: widthCh,
+                fontSize: readerSettings.fontSize + "px",
+                lineHeight: String(readerSettings.lineSpacing)
+              }
+            },
+              h("header", { className: "reader-article-header" },
+                h("div", { className: "reader-kicker" },
+                  h("span", { className: "domain-pill" }, (activeItem && (activeItem.publisher || activeItem.domain)) || "Essay"),
+                  h("span", null, "· " + String((activeItem && activeItem.reading_time_minutes) || 5) + " min read")
+                ),
+                h("h1", { id: "reader-title" }, (activeItem && activeItem.title) || "Reader View"),
+                activeItem && activeItem.description ? h("p", { className: "reader-lead-dek" }, activeItem.description) : null,
+                h("p", { className: "reader-byline" },
+                  h("span", null, "By ", h("strong", null, (activeItem && activeItem.author) || "Editorial Staff"), " · ", (activeItem && activeItem.domain) || ""),
+                  activeItem && activeItem.url
+                    ? h("a", { href: activeItem.url, target: "_blank", rel: "noopener noreferrer" }, "Original Source ↗")
+                    : null
+                )
+              ),
+              showHero
+                ? h("figure", { className: "reader-hero-figure" },
+                    h("img", {
+                      src: activeItem.featured_image,
+                      alt: activeItem.title,
+                      loading: "lazy",
+                      decoding: "async",
+                      onClick: function() { setLightboxSrc(activeItem.featured_image); }
+                    }),
+                    h("figcaption", null, "Featured illustration for “" + activeItem.title + "”")
+                  )
+                : null,
+              h("div", {
+                className: "reader-body",
+                id: "reader-body-content",
+                onClick: function(e) {
+                  if (e.target && e.target.tagName === "IMG") {
+                    setLightboxSrc(e.target.getAttribute("src"));
+                  }
+                },
+                dangerouslySetInnerHTML: { __html: bodyHtml }
+              })
+            ),
+
+            h("aside", { className: "reader-marginalia-rail", "aria-label": "Highlights and Margin Notes" },
+              h("h2", { className: "rail-heading" }, "Notebook & Marginalia"),
+              h("form", { className: "annotation-composer", id: "annotation-form", onSubmit: submitHighlight },
+                h("label", { for: "annotation-quote-input" }, "Highlight Passage"),
+                h("input", {
+                  id: "annotation-quote-input",
+                  name: "exactQuote",
+                  type: "text",
+                  required: true,
+                  value: quoteDraft,
+                  placeholder: "Select text in essay or paste quote...",
+                  onInput: function(e) { setQuoteDraft(e.target.value); }
+                }),
+                h("label", { for: "annotation-note-input" }, "Margin Note"),
+                h("input", {
+                  id: "annotation-note-input",
+                  name: "note",
+                  type: "text",
+                  value: noteDraft,
+                  placeholder: "Add synthesis note or takeaway...",
+                  onInput: function(e) { setNoteDraft(e.target.value); }
+                }),
+                h("button", { type: "submit", className: "btn-primary" }, "Save Highlight")
+              ),
+              h("div", { className: "annotation-list", id: "annotation-list-container" },
+                activeAnnotations.length === 0
+                  ? h("p", { className: "annotation-note" }, "Select any sentence in the essay to capture a highlight or margin note.")
+                  : activeAnnotations.map(function(ann) {
+                      return h("div", { className: "annotation-card", key: ann.id },
+                        h("p", { className: "annotation-quote" }, "“" + ann.exact_quote + "”"),
+                        ann.note ? h("p", { className: "annotation-note" }, ann.note) : null
+                      );
+                    })
+              )
+            )
+          )
+        );
+      } else if (screen === "settings") {
+        mainViewNode = h("section", { "aria-labelledby": "settings-heading" },
+          h("header", { className: "library-header" },
+            h("div", { className: "library-title-group" },
+              h("h1", { id: "settings-heading" }, "Reading Themes & Typography"),
+              h("p", { className: "library-subtitle" }, "Calibrated color tokens passing WCAG 2.2 AA contrast for multi-hour mobile & desktop reading.")
+            )
+          ),
+          h("form", {
+            id: "theme-switcher-form",
+            "aria-label": "Theme Selection",
+            onSubmit: function(e) { e.preventDefault(); setScreen("library"); showToast("Theme & typography saved"); }
+          },
+            h("fieldset", { style: { border: "none", padding: 0, margin: 0 } },
+              h("legend", { className: "rail-heading" }, "Active Reading Theme"),
+              h("div", { className: "settings-grid" },
+                [
+                  ["editorial-light", "Editorial Light", "Warm ivory paper & literary serif"],
+                  ["soft-sepia", "Soft Sepia", "Low-blue-light archival book paper"],
+                  ["swiss-minimal", "Swiss Minimal", "High-precision neo-grotesque grid"],
+                  ["midnight-amoled", "Midnight AMOLED", "True pitch-black night reading"]
+                ].map(function(opt) {
+                  return h("label", { className: "theme-card-option", key: opt[0], onClick: function() { switchTheme(opt[0]); } },
+                    h("input", { type: "radio", name: "theme", value: opt[0], checked: theme === opt[0] }),
+                    h("div", null, h("strong", null, opt[1]), h("br"), h("small", null, opt[2]))
+                  );
+                })
+              )
+            ),
+            h("button", { type: "submit", className: "btn-primary" }, "Return to Library")
+          )
+        );
+      } else if (screen === "command-palette") {
+        mainViewNode = h("div", {
+          role: "dialog",
+          "aria-modal": "true",
+          "aria-labelledby": "cmd-palette-title",
+          className: "command-palette-dialog"
+        },
+          h("h1", { id: "cmd-palette-title" }, "Command Palette (Cmd+K)"),
+          h("label", { for: "cmd-input" }, "Run a command"),
+          h("input", { id: "cmd-input", type: "text", placeholder: "Select a quick action below..." }),
+          h("ul", { role: "listbox", "aria-label": "Available Commands" },
+            h("li", { role: "option", "aria-selected": "true", onClick: function() { setActiveSheet("capture"); setScreen("library"); } },
+              h("span", null, "Save URL to Library"), h("span", { className: "kbd-shortcut" }, "C")
+            ),
+            h("li", { role: "option", "aria-selected": "false", onClick: function() { navigateToView("unread"); } },
+              h("span", null, "Filter Unread Queue"), h("span", { className: "kbd-shortcut" }, "U")
+            ),
+            h("li", { role: "option", "aria-selected": "false", onClick: function() { navigateToView("favorites"); } },
+              h("span", null, "View Starred Essays ★"), h("span", { className: "kbd-shortcut" }, "S")
+            ),
+            h("li", { role: "option", "aria-selected": "false", onClick: function() { setActiveSheet("typography"); } },
+              h("span", null, "Appearance & Typography Sheet"), h("span", { className: "kbd-shortcut" }, "Aa")
+            ),
+            h("li", { role: "option", "aria-selected": "false", onClick: function() { setScreen("library"); } },
+              h("span", null, "Close Command Palette"), h("span", { className: "kbd-shortcut" }, "Esc")
+            )
+          )
+        );
+      }
+
+      // Slide-up Mobile Bottom Sheet for Typography & Themes ("Aa"), Quick Capture ("+ Save"), or Notebook
+      var bottomSheetNode = null;
+      if (activeSheet === "typography") {
+        bottomSheetNode = h("div", {
+          className: "bottom-sheet-backdrop",
+          onClick: function(e) { if (e.target === e.currentTarget) setActiveSheet(null); }
+        },
+          h("div", { className: "bottom-sheet-panel", role: "dialog", "aria-label": "Appearance and Typography" },
+            h("div", { className: "bottom-sheet-handle" }),
+            h("div", { className: "bottom-sheet-header" },
+              h("h3", null, "Reading Appearance (Aa)"),
+              h("button", { type: "button", className: "btn-secondary", onClick: function() { setActiveSheet(null); } }, "Done")
+            ),
+            h("div", { className: "sheet-control-row" },
+              h("span", { className: "sheet-control-label" }, "Paper Theme"),
+              h("div", { className: "theme-pills", style: { marginTop: 0, width: "65%" } },
+                [
+                  ["editorial-light", "Ivory"],
+                  ["soft-sepia", "Sepia"],
+                  ["swiss-minimal", "Swiss"],
+                  ["midnight-amoled", "AMOLED"]
+                ].map(function(t) {
+                  return h("button", {
+                    type: "button",
+                    key: t[0],
+                    className: "theme-pill-btn " + (theme === t[0] ? "active" : ""),
+                    onClick: function() { switchTheme(t[0]); }
+                  }, t[1]);
+                })
+              )
+            ),
+            h("div", { className: "sheet-control-row" },
+              h("span", { className: "sheet-control-label" }, "Typeface"),
+              h("div", { className: "item-actions" },
+                h("button", {
+                  type: "button",
+                  className: "btn-secondary " + (readerSettings.fontFamily === "serif" ? "active" : ""),
+                  onClick: function() { updateReaderSetting({ fontFamily: "serif" }); }
+                }, "Book Serif"),
+                h("button", {
+                  type: "button",
+                  className: "btn-secondary " + (readerSettings.fontFamily === "sans" ? "active" : ""),
+                  onClick: function() { updateReaderSetting({ fontFamily: "sans" }); }
+                }, "Humanist Sans")
+              )
+            ),
+            h("div", { className: "sheet-control-row" },
+              h("span", { className: "sheet-control-label" }, "Font Size (" + readerSettings.fontSize + "px)"),
+              h("div", { className: "item-actions" },
+                h("button", {
+                  type: "button",
+                  className: "btn-secondary",
+                  onClick: function() { updateReaderSetting({ fontSize: Math.max(15, readerSettings.fontSize - 1) }); }
+                }, "A− Smaller"),
+                h("button", {
+                  type: "button",
+                  className: "btn-secondary",
+                  onClick: function() { updateReaderSetting({ fontSize: Math.min(26, readerSettings.fontSize + 1) }); }
+                }, "A+ Larger")
+              )
+            ),
+            h("div", { className: "sheet-control-row" },
+              h("span", { className: "sheet-control-label" }, "Line Spacing"),
+              h("div", { className: "item-actions" },
+                [1.5, 1.75, 2.0].map(function(lh) {
+                  return h("button", {
+                    type: "button",
+                    key: String(lh),
+                    className: "btn-secondary " + (readerSettings.lineSpacing === lh ? "active" : ""),
+                    onClick: function() { updateReaderSetting({ lineSpacing: lh }); }
+                  }, String(lh) + "×");
+                })
+              )
+            )
+          )
+        );
+      } else if (activeSheet === "capture") {
+        bottomSheetNode = h("div", {
+          className: "bottom-sheet-backdrop",
+          onClick: function(e) { if (e.target === e.currentTarget) setActiveSheet(null); }
+        },
+          h("div", { className: "bottom-sheet-panel", role: "dialog", "aria-label": "Save Article URL" },
+            h("div", { className: "bottom-sheet-handle" }),
+            h("div", { className: "bottom-sheet-header" },
+              h("h3", null, "Save Article to Library"),
+              h("button", { type: "button", className: "btn-secondary", onClick: function() { setActiveSheet(null); } }, "Close")
+            ),
+            h("form", { className: "annotation-composer", onSubmit: submitCaptureUrl, style: { border: "none", marginBottom: 0, paddingBottom: 0 } },
+              h("label", { for: "sheet-capture-url" }, "Article or Essay URL"),
+              h("input", {
+                id: "sheet-capture-url",
+                type: "url",
+                required: true,
+                value: captureUrl,
+                placeholder: "https://example.com/essay",
+                onInput: function(e) { setCaptureUrl(e.target.value); }
+              }),
+              h("button", { type: "submit", className: "btn-primary" }, capturing ? "Extracting..." : "Save for Offline Reading")
+            )
+          )
+        );
+      } else if (activeSheet === "notebook") {
+        bottomSheetNode = h("div", {
+          className: "bottom-sheet-backdrop",
+          onClick: function(e) { if (e.target === e.currentTarget) setActiveSheet(null); }
+        },
+          h("div", { className: "bottom-sheet-panel", role: "dialog", "aria-label": "Notebook and Highlights" },
+            h("div", { className: "bottom-sheet-handle" }),
+            h("div", { className: "bottom-sheet-header" },
+              h("h3", null, "Notebook & Highlights"),
+              h("button", { type: "button", className: "btn-secondary", onClick: function() { setActiveSheet(null); } }, "Done")
+            ),
+            h("form", { className: "annotation-composer", onSubmit: submitHighlight },
+              h("label", { for: "sheet-quote-input" }, "Highlight Passage"),
+              h("input", {
+                id: "sheet-quote-input",
+                type: "text",
+                required: true,
+                value: quoteDraft,
+                placeholder: "Selected quote or passage...",
+                onInput: function(e) { setQuoteDraft(e.target.value); }
+              }),
+              h("label", { for: "sheet-note-input" }, "Margin Note"),
+              h("input", {
+                id: "sheet-note-input",
+                type: "text",
+                value: noteDraft,
+                placeholder: "Add takeaway note...",
+                onInput: function(e) { setNoteDraft(e.target.value); }
+              }),
+              h("button", { type: "submit", className: "btn-primary" }, "Save Highlight")
+            ),
+            h("div", { className: "annotation-list" },
+              activeAnnotations.map(function(ann) {
+                return h("div", { className: "annotation-card", key: ann.id },
+                  h("p", { className: "annotation-quote" }, "“" + ann.exact_quote + "”"),
+                  ann.note ? h("p", { className: "annotation-note" }, ann.note) : null
+                );
+              })
+            )
+          )
+        );
+      }
+
+      return h("div", { className: "folio-react-spa" },
+        h("div", { className: "reading-progress-track", "aria-hidden": "true" },
+          h("div", { className: "reading-progress-fill", id: "reading-progress-bar" })
+        ),
+
+        // Mobile Top Bar
+        h("header", { className: "mobile-top-bar", "aria-label": "Mobile App Bar" },
+          h("button", {
+            type: "button",
+            className: "brand-title",
+            onClick: function() { setScreen("library"); }
+          },
+            h("span", { className: "brand-mark" }, "F"),
+            h("span", null, screen === "reader" ? "Reading View" : "Folio Reader")
+          ),
+          h("div", { className: "item-actions" },
+            screen === "reader"
+              ? h("button", { type: "button", className: "btn-secondary", onClick: function() { setActiveSheet("notebook"); } }, "Notes (" + activeAnnotations.length + ")")
+              : h("button", { type: "button", className: "btn-secondary", onClick: function() { setActiveSheet("capture"); } }, "+ Save"),
+            h("button", { type: "button", className: "btn-secondary", onClick: function() { setActiveSheet("typography"); } }, "Aa")
+          )
+        ),
+
+        // Mobile Horizontal Swipeable Filter Strip (visible on Library screen)
+        screen === "library"
+          ? h("nav", { className: "mobile-filter-strip", "aria-label": "Queue Filter Chips" },
+              [
+                ["all", "All (" + allItems.length + ")"],
+                ["inbox", "Inbox"],
+                ["unread", "Unread"],
+                ["favorites", "Starred ★"],
+                ["archived", "Archive"],
+                ["failed", "Failed"]
+              ].map(function(chip) {
+                return h("button", {
+                  type: "button",
+                  key: chip[0],
+                  className: "mobile-chip " + (view === chip[0] ? "active" : ""),
+                  onClick: function() { navigateToView(chip[0]); }
+                }, chip[1]);
+              })
+            )
+          : null,
+
+        h("div", { className: "app-shell " + (isDistractionFree ? "distraction-free" : ""), id: "app-shell-container" },
+          isDistractionFree
+            ? null
+            : h("nav", { className: "sidebar", "aria-label": "Primary Navigation" },
+                h("div", null,
+                  h("div", { className: "brand-header" },
+                    h("button", {
+                      type: "button",
+                      className: "brand-title",
+                      onClick: function() { navigateToView("all"); }
+                    },
+                      h("span", { className: "brand-mark" }, "F"),
+                      h("span", null, "Folio Reader")
+                    ),
+                    h("button", {
+                      type: "button",
+                      className: "kbd-shortcut",
+                      onClick: function() { setScreen("command-palette"); }
+                    }, "⌘K")
+                  ),
+                  h("div", { className: "nav-section-label" }, "Reading Queue"),
+                  h("div", { className: "nav-list" },
+                    [
+                      ["all", "All Essays", allItems.length],
+                      ["inbox", "Inbox", null],
+                      ["unread", "Unread", null],
+                      ["favorites", "Starred ★", null],
+                      ["archived", "Archive", null],
+                      ["failed", "Failed", null]
+                    ].map(function(navItem) {
+                      return h("button", {
+                        type: "button",
+                        key: navItem[0],
+                        className: "nav-link " + (screen === "library" && view === navItem[0] ? "active" : ""),
+                        onClick: function() { navigateToView(navItem[0]); }
+                      },
+                        h("span", null, navItem[1]),
+                        navItem[2] !== null ? h("span", { className: "nav-count" }, String(navItem[2])) : null
+                      );
+                    })
+                  ),
+                  h("div", { className: "nav-section-label" }, "Workspace"),
+                  h("div", { className: "nav-list" },
+                    h("button", {
+                      type: "button",
+                      className: "nav-link " + (screen === "reader" ? "active" : ""),
+                      onClick: function() { if (activeItem) openReaderForItem(activeItem.id); }
+                    }, h("span", null, "Active Reader")),
+                    h("button", {
+                      type: "button",
+                      className: "nav-link " + (screen === "settings" ? "active" : ""),
+                      onClick: function() { setScreen("settings"); }
+                    }, h("span", null, "Themes & Typography")),
+                    h("button", {
+                      type: "button",
+                      className: "nav-link " + (screen === "command-palette" ? "active" : ""),
+                      onClick: function() { setScreen("command-palette"); }
+                    }, h("span", null, "Command Palette"))
+                  )
+                ),
+                h("div", { className: "sidebar-footer" },
+                  h("div", { className: "nav-section-label", style: { marginTop: 0 } }, "Paper & Contrast"),
+                  h("div", { className: "theme-pills", role: "group", "aria-label": "Quick Theme Switcher" },
+                    [
+                      ["editorial-light", "Ivory Light"],
+                      ["soft-sepia", "Warm Sepia"],
+                      ["swiss-minimal", "Swiss Crisp"],
+                      ["midnight-amoled", "AMOLED Dark"]
+                    ].map(function(tp) {
+                      return h("button", {
+                        type: "button",
+                        key: tp[0],
+                        className: "theme-pill-btn " + (theme === tp[0] ? "active" : ""),
+                        onClick: function() { switchTheme(tp[0]); }
+                      }, tp[1]);
+                    })
+                  )
+                )
+              ),
+          h("main", { className: "main-region", id: "main-content" }, mainViewNode)
+        ),
+
+        // Mobile Fixed Bottom Navigation Bar (5 Tabs)
+        h("nav", { className: "mobile-bottom-nav", "aria-label": "Mobile Bottom Navigation" },
+          h("button", {
+            type: "button",
+            className: "mobile-tab-btn " + (screen === "library" && view !== "favorites" ? "active" : ""),
+            onClick: function() { navigateToView("all"); }
+          },
+            h("span", { className: "mobile-tab-icon" }, "📚"),
+            h("span", null, "Library")
+          ),
+          h("button", {
+            type: "button",
+            className: "mobile-tab-btn " + (screen === "reader" ? "active" : ""),
+            onClick: function() { if (activeItem) openReaderForItem(activeItem.id); }
+          },
+            h("span", { className: "mobile-tab-icon" }, "📖"),
+            h("span", null, "Reader")
+          ),
+          h("button", {
+            type: "button",
+            className: "mobile-tab-btn " + (activeSheet === "capture" ? "active" : ""),
+            onClick: function() { setActiveSheet(activeSheet === "capture" ? null : "capture"); }
+          },
+            h("span", { className: "mobile-tab-icon" }, "➕"),
+            h("span", null, "Save URL")
+          ),
+          h("button", {
+            type: "button",
+            className: "mobile-tab-btn " + (screen === "library" && view === "favorites" ? "active" : ""),
+            onClick: function() { navigateToView("favorites"); }
+          },
+            h("span", { className: "mobile-tab-icon" }, "★"),
+            h("span", null, "Starred")
+          ),
+          h("button", {
+            type: "button",
+            className: "mobile-tab-btn " + (activeSheet === "typography" ? "active" : ""),
+            onClick: function() { setActiveSheet(activeSheet === "typography" ? null : "typography"); }
+          },
+            h("span", { className: "mobile-tab-icon" }, "Aa"),
+            h("span", null, "Theme")
+          )
+        ),
+
+        bottomSheetNode,
+
+        lightboxSrc
+          ? h("div", {
+              className: "image-lightbox open",
+              id: "reader-image-lightbox",
+              role: "dialog",
+              onClick: function() { setLightboxSrc(null); }
+            },
+              h("img", { src: lightboxSrc, alt: "Expanded figure preview" })
+            )
+          : null,
+
+        toast ? h("div", { className: "react-toast-banner", role: "status" }, toast) : null
+      );
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+      var stateEl = document.getElementById("folio-initial-state");
+      var rootEl = document.getElementById("react-root");
+      if (!stateEl || !rootEl) return;
+      try {
+        var parsedState = JSON.parse(stateEl.textContent || "{}");
+        // Only mount interactive React SPA on standard screens (library, reader, settings, command-palette)
+        if (["library", "reader", "settings", "command-palette"].includes(parsedState.screen)) {
+          var root = ReactRuntime.createRoot(rootEl);
+          root.render(h(FolioReactApp, { initialState: parsedState }));
+        }
+      } catch (e) {}
+
+      // Scroll listener for reading progress bar and text selection
+      window.addEventListener("scroll", function() {
+        var bar = document.getElementById("reading-progress-bar");
+        if (!bar) return;
+        var docEl = document.documentElement;
+        var top = docEl.scrollTop || document.body.scrollTop;
+        var height = docEl.scrollHeight - docEl.clientHeight;
+        var pct = height > 0 ? Math.min(100, Math.max(0, Math.round((top / height) * 100))) : 0;
+        bar.style.width = pct + "%";
+      }, { passive: true });
+    });
+  })();
+  </script>
 </body>
 </html>

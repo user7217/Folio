@@ -131,7 +131,6 @@ test('Security: Hostile feeds, malformed PDF/EPUB, zip-bombs, and blob path trav
   const dataDir = createSecDataDir('hostile-files');
   try {
     const db = new ContainedDatabase(dataDir);
-    db.migrate();
     const app = new ReadingPlatformApp(db);
 
     // Blob store rejects path traversal IDs
@@ -195,7 +194,6 @@ test('Security: Cross-user isolation across Search, Graph, Export, Recommendatio
   const dataDir = createSecDataDir('isolation');
   try {
     const db = new ContainedDatabase(dataDir);
-    db.migrate();
     const app = new ReadingPlatformApp(db);
 
     await app.handleRequest({

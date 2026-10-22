@@ -70,7 +70,6 @@ export async function runDatasetBenchmark(config: DatasetConfig, label: string) 
   try {
     const rand = createSeededPrng(config.seed);
     const db = new ContainedDatabase(benchDir);
-    db.migrate();
     const app = new ReadingPlatformApp(db);
 
     // Bootstrap primary user and secondary user for sharing tests
@@ -414,7 +413,6 @@ export async function runDatasetBenchmark(config: DatasetConfig, label: string) 
     // Workload 5: Batch processing of 200 pages served by local fixture server (run on isolated DB so 10k lock wait isn't repeated 200x)
     const batchDir = path.join(benchDir, 'batch-200');
     const batchDb = new ContainedDatabase(batchDir);
-    batchDb.migrate();
     const batchWorker = new WorkerEngine(batchDb, {
       resolver: async () => [{ address: '93.184.216.34', family: 4 }],
       transport: async (req) => ({

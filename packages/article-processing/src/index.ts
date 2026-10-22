@@ -4,7 +4,7 @@ import type { EpubSpineItem, OcrStatus, PdfPageContent, TocEntry } from '../../s
 import { parseAndNormalizeUrl } from '../../shared/src/url.ts';
 
 export const EXTRACTOR_NAME = 'contained-readability';
-export const EXTRACTOR_VERSION = '2.0.0';
+export const EXTRACTOR_VERSION = '2.1.0';
 
 const ALLOWED_TAGS = new Set([
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
@@ -70,11 +70,34 @@ function sanitizeUrlAttr(rawVal: string, baseUrl: string, allowRelative: boolean
   }
 }
 
+export function sanitizeImageUrlAttr(rawVal: string, baseUrl: string): string | null {
+  const decoded = decodeHtmlEntities(rawVal).replace(/[\u0000-\u0020\u007f]+/g, '').trim();
+  if (!decoded) return null;
+  // Allow safe base64-encoded raster or SVG data URIs on <img>
+  if (/^data:image\/(png|jpeg|jpg|gif|webp|svg\+xml);base64,[a-zA-Z0-9+/=]+$/i.test(decoded)) {
+    return decoded;
+  }
+  // Allow local illustration routes served by the web app
+  if (/^\/api\/illustrations\/[a-zA-Z0-9_-]+\.svg$/i.test(decoded)) {
+    return decoded;
+  }
+  return sanitizeUrlAttr(decoded, baseUrl, true);
+}
+
+function extractFirstSrcFromSrcset(rawSrcset: string): string | null {
+  const decoded = decodeHtmlEntities(rawSrcset).trim();
+  if (!decoded) return null;
+  const firstCandidate = decoded.split(',')[0]?.trim();
+  if (!firstCandidate) return null;
+  const urlPart = firstCandidate.split(/\s+/)[0]?.trim();
+  return urlPart || null;
+}
+
 /**
  * Server-side HTML sanitizer with an explicit allowlist of tags and attributes.
  * - Strips all dangerous tags (<script>, <svg>, <math>, <iframe>, <style>, <form>, etc.)
  * - Strips all event handlers (on*) and style/class/srcdoc/formaction attributes
- * - Rewrites relative URLs against baseUrl
+ * - Rewrites relative URLs against baseUrl and promotes lazy-loaded image attributes (data-src, data-original, srcset)
  * - Enforces rel="noopener noreferrer" on links
  */
 export function sanitizeHtml(dirtyHtml: string, baseUrl: string = 'https://example.com'): string {
@@ -89,16 +112,20 @@ export function sanitizeHtml(dirtyHtml: string, baseUrl: string = 'https://examp
   while (prev !== cleaned) {
     prev = cleaned;
     for (const badTag of DROP_WITH_CONTENT_TAGS) {
-      const rePaired = new RegExp(`<${badTag}\\b[^>]*>[\\s\\S]*?<\\/${badTag}\\s*>`, 'gi');
+      const rePaired = new RegExp(`<${badTag}\\b[^>]*>[\\s\\S]*?<\\/${badTag}\\b[^>]*>`, 'gi');
       cleaned = cleaned.replace(rePaired, '');
-      const reUnclosed = new RegExp(`<${badTag}\\b[^>]*>`, 'gi');
+      if (badTag === 'script' || badTag === 'style') {
+        const reUnclosedBody = new RegExp(`<${badTag}\\b[^>]*>[\\s\\S]*$`, 'gi');
+        cleaned = cleaned.replace(reUnclosedBody, '');
+      }
+      const reUnclosed = new RegExp(`<\\/?${badTag}\\b[^>]*>`, 'gi');
       cleaned = cleaned.replace(reUnclosed, '');
     }
   }
 
-  // Process remaining HTML tags via state-machine tokenizer
+  // Process remaining HTML tags via state-machine tokenizer (allowing '>' inside quoted attributes)
   const out: string[] = [];
-  const tagRegex = /<\/?([a-zA-Z0-9:-]+)([^>]*)>/g;
+  const tagRegex = /<\/?([a-zA-Z0-9:-]+)((?:"[^"]*"|'[^']*'|[^'">])*)>/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
@@ -127,6 +154,9 @@ export function sanitizeHtml(dirtyHtml: string, baseUrl: string = 'https://examp
 
     // Parse attributes safely
     const safeAttrs: string[] = [];
+    let imgPrimarySrc: string | null = null;
+    let imgFallbackSrc: string | null = null;
+    let imgAlt: string | null = null;
     const attrRegex = /([a-zA-Z0-9_:-]+)\s*(?:=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
     let attrMatch: RegExpExecArray | null;
     while ((attrMatch = attrRegex.exec(attrString)) !== null) {
@@ -143,12 +173,33 @@ export function sanitizeHtml(dirtyHtml: string, baseUrl: string = 'https://examp
           safeAttrs.push(`href="${escapeHtml(safeHref)}"`);
         }
       } else if (tagName === 'img' && attrName === 'src') {
-        const safeSrc = sanitizeUrlAttr(rawVal, baseUrl);
+        const safeSrc = sanitizeImageUrlAttr(rawVal, baseUrl);
         if (safeSrc) {
-          safeAttrs.push(`src="${escapeHtml(safeSrc)}"`);
+          imgPrimarySrc = safeSrc;
+        }
+      } else if (
+        tagName === 'img' &&
+        (attrName === 'data-src' || attrName === 'data-original' || attrName === 'data-lazy-src')
+      ) {
+        const safeLazy = sanitizeImageUrlAttr(rawVal, baseUrl);
+        if (safeLazy && !imgFallbackSrc) {
+          imgFallbackSrc = safeLazy;
+        }
+      } else if (tagName === 'img' && (attrName === 'srcset' || attrName === 'data-srcset')) {
+        const firstSrc = extractFirstSrcFromSrcset(rawVal);
+        if (firstSrc) {
+          const safeSrcsetUrl = sanitizeImageUrlAttr(firstSrc, baseUrl);
+          if (safeSrcsetUrl && !imgFallbackSrc) {
+            imgFallbackSrc = safeSrcsetUrl;
+          }
         }
       } else if (tagName === 'img' && attrName === 'alt') {
-        safeAttrs.push(`alt="${escapeHtml(decodeHtmlEntities(rawVal))}"`);
+        imgAlt = escapeHtml(decodeHtmlEntities(rawVal));
+      } else if (tagName === 'img' && (attrName === 'width' || attrName === 'height')) {
+        const dim = Number.parseInt(rawVal, 10);
+        if (dim > 1 && dim <= 4096) {
+          safeAttrs.push(`${attrName}="${dim}"`);
+        }
       } else if ((attrName === 'title' || attrName === 'id') && rawVal) {
         const cleanId = decodeHtmlEntities(rawVal).replace(/[^a-zA-Z0-9_\-:. ]/g, '');
         if (cleanId) {
@@ -167,9 +218,18 @@ export function sanitizeHtml(dirtyHtml: string, baseUrl: string = 'https://examp
       safeAttrs.push('target="_blank"');
     }
 
-    if (tagName === 'img' && !safeAttrs.some((a) => a.startsWith('src='))) {
-      // Drop img without valid src
-      continue;
+    if (tagName === 'img') {
+      const resolvedSrc = imgPrimarySrc || imgFallbackSrc;
+      if (!resolvedSrc) {
+        // Drop img without valid src or fallback lazy src
+        continue;
+      }
+      safeAttrs.unshift(`src="${escapeHtml(resolvedSrc)}"`);
+      if (imgAlt !== null) {
+        safeAttrs.push(`alt="${imgAlt}"`);
+      }
+      safeAttrs.push('loading="lazy"');
+      safeAttrs.push('decoding="async"');
     }
 
     const attrPart = safeAttrs.length > 0 ? ` ${safeAttrs.join(' ')}` : '';
@@ -257,6 +317,7 @@ export function extractArticle(rawHtml: string, pageUrl: string): ExtractedArtic
   let jsonLdDate: string | null = null;
   let jsonLdPublisher: string | null = null;
   let jsonLdDesc: string | null = null;
+  let jsonLdImage: string | null = null;
 
   const ldMatch = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i.exec(rawHtml);
   if (ldMatch) {
@@ -271,6 +332,8 @@ export function extractArticle(rawHtml: string, pageUrl: string): ExtractedArtic
         if (typeof obj.author === 'string') jsonLdAuthor = obj.author;
         else if (obj.author && typeof obj.author.name === 'string') jsonLdAuthor = obj.author.name;
         if (obj.publisher && typeof obj.publisher.name === 'string') jsonLdPublisher = obj.publisher.name;
+        if (typeof obj.image === 'string') jsonLdImage = obj.image;
+        else if (obj.image && typeof obj.image.url === 'string') jsonLdImage = obj.image.url;
       }
     } catch {
       // Ignore malformed JSON-LD
@@ -325,8 +388,8 @@ export function extractArticle(rawHtml: string, pageUrl: string): ExtractedArtic
     publishedAt = new Date(rawPublished).toISOString();
   }
 
-  const rawImage = getMetaContent(rawHtml, ['og:image', 'twitter:image']);
-  const featuredImage = rawImage ? sanitizeUrlAttr(rawImage, baseUrl) : null;
+  const rawImage = getMetaContent(rawHtml, ['og:image', 'twitter:image', 'twitter:image:src']) || jsonLdImage;
+  let featuredImage = rawImage ? sanitizeImageUrlAttr(rawImage, baseUrl) : null;
 
   const langMatch = /<html[^>]+lang=["']([a-zA-Z-]+)["']/i.exec(rawHtml);
   const language = langMatch ? langMatch[1].toLowerCase() : 'en';
@@ -351,6 +414,14 @@ export function extractArticle(rawHtml: string, pageUrl: string): ExtractedArtic
 
   const sanitizedHtml = sanitizeHtml(candidateHtml, baseUrl);
   const plainText = extractPlainText(sanitizedHtml);
+
+  // Fallback featuredImage to the first valid <img src="..."> in sanitizedHtml if og:image was missing
+  if (!featuredImage) {
+    const firstImgMatch = /<img[^>]+src="([^"]+)"/i.exec(sanitizedHtml);
+    if (firstImgMatch && firstImgMatch[1]) {
+      featuredImage = decodeHtmlEntities(firstImgMatch[1]);
+    }
+  }
 
   // Extract headings and ensure each heading in sanitizedHtml has a deterministic id for TOC
   const toc: TocEntry[] = [];
@@ -907,20 +978,15 @@ export function parseEpubBuffer(
   }
 
   if (spine.length === 0) {
-    throw new Error('Invalid EPUB: no readable spine items found');
+    throw new Error('Invalid EPUB: no readable spine chapters found');
   }
-
-  const combinedHtml = spine
-    .map((ch) => `<section id="${ch.id}"><h2>${escapeHtml(ch.title)}</h2>${ch.sanitized_html}</section>`)
-    .join('\n');
-  const combinedPlain = spine.map((ch) => `${ch.title}\n${ch.plain_text}`).join('\n\n');
 
   return {
     title,
     author,
     spine,
     toc,
-    sanitizedHtml: combinedHtml,
-    plainText: combinedPlain,
+    sanitizedHtml: spine.map((s) => `<section id="${s.id}"><h2>${escapeHtml(s.title)}</h2>${s.sanitized_html}</section>`).join('\n'),
+    plainText: spine.map((s) => s.plain_text).join('\n\n'),
   };
 }

@@ -1,9 +1,62 @@
-# Workspace Caches & Runtime Data
-.cache/
+# =============================================================================
+# 1. Gemini & AI Workspace / Agent Artifacts
+# =============================================================================
+.gemini/
+.agent/
+.claude/
+artifacts/
+qa_audit_operations.jsonl
+implementation_plan.md
+research_notes.md
+task.md
+watchlist.md
+
+# =============================================================================
+# 2. Virtual Environments & Package / Runtime Caches
+# =============================================================================
+.venv/
+venv/
+env/
+ENV/
+.conda/
+__pycache__/
+*.py[cod]
+*$py.class
+.python-version
 node_modules/
-dist/
+.pnpm-store/
+.cache/
+
+# =============================================================================
+# 3. Database Files, WAL Logs, Binary Blobs & Backup Archives
+# =============================================================================
 data/
+data/*
+data/**
+data-restored/
+data-restored/*
+data-restored/**
+blobs/
+db.json
+db.json.*
+*.wal.jsonl
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+backup.zip
+*.backup.zip
+
+# =============================================================================
+# 4. Build Artifacts, Logs, Secrets & OS Files
+# =============================================================================
+dist/
 *.tsbuildinfo
+evidence/logs/*.log
+*.log
 .env
 .env.local
+.env.*.local
 .DS_Store
+Thumbs.db

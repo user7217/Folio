@@ -10,7 +10,6 @@ const smokeDataDir = path.join(rootDir, '.cache', `smoke-${process.pid}-${Date.n
 
 try {
   const db = new ContainedDatabase(smokeDataDir);
-  db.migrate();
   const app = new ReadingPlatformApp(db);
   const worker = new WorkerEngine(db, {
     resolver: async () => [{ address: '93.184.216.34', family: 4 }],

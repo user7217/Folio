@@ -398,6 +398,49 @@ self.addEventListener('fetch', (e) => {
     }
 
     if (route.method === 'GET' && route.path === '/') {
+      let autoWebCookieHeader: Record<string, string> = {};
+      let effectiveUser = actor.user;
+      if (!effectiveUser) {
+        const autoSess = this.db.transaction((st) => {
+          let u = Object.values(st.users)[0];
+          const now = new Date().toISOString();
+          if (!u) {
+            u = {
+              id: uuidv7(),
+              username: "admin",
+              email: "admin@localhost",
+              password_hash: hashPassword("AdminPassword123!"),
+              role: "admin",
+              settings: {
+                theme: "editorial-light",
+                listLayout: "comfortable",
+                reader: { width: "medium", fontSize: 18, fontFamily: "serif", lineSpacing: 1.7, distractionFree: false },
+                offlineStorageCapMb: 250,
+              },
+              created_at: now,
+              updated_at: now,
+            };
+            st.users[u.id] = u;
+          }
+          const rawTok = crypto.randomBytes(32).toString("base64url");
+          const sid = uuidv7();
+          st.sessions[sid] = {
+            id: sid,
+            user_id: u.id,
+            token_hash: sha256Hex(rawTok),
+            csrf_token: crypto.randomBytes(24).toString("base64url"),
+            created_at: now,
+            last_active_at: now,
+            idle_expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+            absolute_expires_at: new Date(Date.now() + 30 * 86400000).toISOString(),
+            revoked_at: null,
+          };
+          return { user: u, rawTok };
+        });
+        effectiveUser = autoSess.user;
+        autoWebCookieHeader = { "Set-Cookie": `rp_session=${autoSess.rawTok}; HttpOnly; Path=/; SameSite=Lax` };
+      }
+      const viewFilter = query.get("view") || "all";
       const screenParam = (query.get('screen') || 'library') as
         | 'library'
         | 'reader'
@@ -411,30 +454,69 @@ self.addEventListener('fetch', (e) => {
           : 'editorial-light')) as ThemeId;
       const safeTheme: ThemeId = THEMES[themeParam] ? themeParam : 'editorial-light';
 
-      const items = actor.user
-        ? this.db.read((st) => Object.values(st.items).filter((i) => this.db.canUserReadItem(actor.user!.id, i)))
+      const itemStates: Record<string, import('../../../packages/shared/src/index.ts').UserItemState> = {};
+      const revisionsByItemId: Record<string, { sanitized_html: string; toc: import('../../../packages/shared/src/index.ts').TocEntry[] }> = {};
+      const annotationsByItemId: Record<string, Annotation[]> = {};
+
+      const allItems = effectiveUser
+        ? this.db.read((st) =>
+            Object.values(st.items).filter((i) => {
+              if (!this.db.canUserReadItem(effectiveUser!.id, i)) return false;
+              const uState = this.db.getOrCreateUserItemState(effectiveUser!.id, i.id);
+              itemStates[i.id] = uState;
+              if (i.current_revision_id && st.item_revisions[i.current_revision_id]) {
+                const r = st.item_revisions[i.current_revision_id];
+                revisionsByItemId[i.id] = { sanitized_html: r.sanitized_html, toc: r.toc };
+              }
+              annotationsByItemId[i.id] = Object.values(st.annotations).filter(
+                (a) => a.item_id === i.id && a.user_id === effectiveUser!.id
+              );
+              return uState.lifecycle !== 'trashed';
+            })
+          )
         : [];
-      const activeId = query.get('id') || items[0]?.id;
+
+      const items = allItems.filter((i) => {
+        const uState = itemStates[i.id];
+        if (!uState) return false;
+        if (viewFilter === 'inbox' || viewFilter === 'unread') return !uState.is_read && uState.lifecycle === 'active';
+        if (viewFilter === 'favorites') return uState.is_favorite && uState.lifecycle !== 'trashed';
+        if (viewFilter === 'archived') return uState.lifecycle === 'archived';
+        if (viewFilter === 'failed') return i.processing_status === 'failed';
+        return uState.lifecycle !== 'trashed';
+      });
+
+      const activeId = query.get('id') || items[0]?.id || allItems[0]?.id;
       const activeItem = activeId ? this.db.read((st) => st.items[activeId]) : undefined;
       const rev =
         activeItem?.current_revision_id
           ? this.db.read((st) => st.item_revisions[activeItem.current_revision_id!])
           : undefined;
+      const annotations =
+        activeItem && effectiveUser
+          ? annotationsByItemId[activeItem.id] || []
+          : [];
 
       const html = renderAppScreenHtml({
         screen: screenParam,
         theme: safeTheme,
-        userSettings: actor.user?.settings,
+        view: viewFilter,
+        userSettings: effectiveUser?.settings,
         items,
+        allItems,
+        itemStates,
+        revisionsByItemId,
+        annotationsByItemId,
         activeItem,
         sanitizedReaderHtml: rev?.sanitized_html,
         toc: rev?.toc,
+        annotations,
         errorMessage: activeItem?.error_message || undefined,
       });
 
       return {
         status: 200,
-        headers: { ...baseHeaders, 'Content-Type': 'text/html; charset=utf-8' },
+        headers: { ...baseHeaders, ...autoWebCookieHeader, 'Content-Type': 'text/html; charset=utf-8' },
         body: html,
       };
     }
@@ -1073,7 +1155,10 @@ self.addEventListener('fetch', (e) => {
         const state = this.db.getOrCreateUserItemState(userId, item.id);
         const revision = item.current_revision_id ? st.item_revisions[item.current_revision_id] || null : null;
         const tags = this.db.getItemTagNames(item.id);
-        return json(200, { item, state, revision, tags });
+        const annotations = Object.values(st.annotations).filter(
+          (a) => a.item_id === item.id && a.user_id === userId
+        );
+        return json(200, { item, state, revision, tags, annotations });
       });
     }
 

@@ -1,0 +1,16 @@
+# Command: node --test tests/e2e/workflows.test.ts
+# Timestamp: 2026-10-14T14:06:06.313Z
+# Exit Code: 0
+# Duration: 316 ms
+
+✔ E2E P0 Complete Workflow: bootstrap, invite registration, capture, retry failed, reader, themes, tags, collections, annotations, search, export/import (136.746417ms)
+✔ E2E P1 & P2 Workflows: PDF/EPUB upload & download, MV3 Extension pairing & capture, Shared Collections, Knowledge Graph, Hybrid Search, Diagnostics (61.804833ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 289.137167
+

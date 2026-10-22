@@ -1,0 +1,7 @@
+# Command: node scripts/smoke.ts
+# Timestamp: 2026-10-14T14:06:06.855Z
+# Exit Code: 0
+# Duration: 140 ms
+
+{"status":"passed","check":"smoke","verifiedItems":1}
+

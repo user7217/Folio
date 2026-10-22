@@ -1,3 +1,6 @@
+import dns from "node:dns";
+import http from "node:http";
+import https from "node:https";
 import net from 'node:net';
 import zlib from 'node:zlib';
 import { parseAndNormalizeUrl, UrlValidationError } from './url.ts';
@@ -379,7 +382,8 @@ export async function validateAndPinDestination(
   const resolver: DnsResolverFn =
     options.resolver ||
     (async () => {
-      throw new SsrfError('Outbound DNS resolution disabled unless resolver provided', 'DNS_DISABLED', 'permanent');
+      const lookedUp = await dns.promises.lookup(hostname, { all: true });
+      return lookedUp.map((r) => ({ address: r.address, family: (r.family === 6 ? 6 : 4) as 4 | 6 }));
     });
 
   const records = await resolver(hostname);
@@ -491,16 +495,35 @@ export async function safeFetch(rawUrl: string, options: SafeFetchOptions = {}):
     }
     visitedUrls.add(pinned.normalizedUrl);
 
-    if (!options.transport) {
-      throw new SsrfError('No transport configured for safeFetch', 'TRANSPORT_UNAVAILABLE', 'transient');
-    }
+    const activeTransport: SafeFetchTransport = options.transport || ((req, signal) => new Promise((resolve, reject) => {
+      const u = new URL(req.url);
+      const isHttps = u.protocol === "https:";
+      const mod = isHttps ? https : http;
+      const clientReq = mod.request({
+        host: req.pinnedIp,
+        port: u.port ? Number(u.port) : (isHttps ? 443 : 80),
+        path: u.pathname + u.search,
+        method: "GET",
+        headers: req.headers,
+        servername: req.hostname,
+        signal,
+      }, (res) => {
+        const hdrs: Record<string, string> = {};
+        for (const [k, v] of Object.entries(res.headers)) {
+          if (v !== undefined) hdrs[k] = Array.isArray(v) ? v.join(", ") : String(v);
+        }
+        resolve({ status: res.statusCode || 200, headers: hdrs, body: res });
+      });
+      clientReq.on("error", reject);
+      clientReq.end();
+    }));
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(new SsrfError('Fetch timed out', 'FETCH_TIMEOUT', 'transient')), timeoutMs);
 
     let rawRes: RawTransportResponse;
     try {
-      rawRes = await options.transport(
+      rawRes = await activeTransport(
         {
           url: pinned.normalizedUrl,
           pinnedIp: pinned.pinnedIp,

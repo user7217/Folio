@@ -59,8 +59,8 @@ test('Clean install and migration upgrade from schema v1 with existing data', ()
 
     // 2. Run migrations to upgrade to CURRENT_SCHEMA_VERSION (3)
     const db = new ContainedDatabase(dataDir);
-    const migrations = db.migrate();
-    assert.equal(migrations.length, 3);
+    // Zero-migration direct JSON load:
+    assert.equal(db.read((s) => s.schema_version), 3);
     assert.equal(db.read((s) => s.schema_version), 3);
     assert.equal(db.read((s) => s.items[legacyItemId].title), 'Legacy V1 Article');
   } finally {
@@ -72,7 +72,6 @@ test('Generated Authorization Matrix (Section 9.2): unauthenticated, another use
   const dataDir = createTempDataDir('authz-matrix');
   try {
     const db = new ContainedDatabase(dataDir);
-    db.migrate();
     const app = new ReadingPlatformApp(db);
 
     // Bootstrap owner (admin)
@@ -271,7 +270,6 @@ test('Capture -> Job -> Extraction -> Search -> Reprocess -> Delete consistency 
   const dataDir = createTempDataDir('pipeline');
   try {
     const db = new ContainedDatabase(dataDir);
-    db.migrate();
     const app = new ReadingPlatformApp(db);
 
     let articleVersion = 1;
@@ -434,7 +432,6 @@ test('Worker crash / kill mid-job recovery and retry/backoff/dead-letter behavio
   const dataDir = createTempDataDir('worker-recovery');
   try {
     const db = new ContainedDatabase(dataDir);
-    db.migrate();
 
     // Enqueue a capture job and spawn a real OS worker child process with slow simulation, then SIGKILL it mid-job
     const itemId = uuidv7();
@@ -525,7 +522,6 @@ test('Feeds conditional GET (ETag / 304), offline sync replay with conflicts, an
   const restoreDir = createTempDataDir('restored-db');
   try {
     const db = new ContainedDatabase(dataDir);
-    db.migrate();
     const app = new ReadingPlatformApp(db);
 
     await app.handleRequest({

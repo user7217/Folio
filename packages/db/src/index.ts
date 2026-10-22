@@ -73,7 +73,7 @@ export interface DatabaseState {
   worker_heartbeats: Record<string, WorkerHeartbeat>;
 }
 
-export function createEmptyDatabaseState(schemaVersion: number = 0): DatabaseState {
+export function createEmptyDatabaseState(schemaVersion: number = CURRENT_SCHEMA_VERSION): DatabaseState {
   return {
     schema_version: schemaVersion,
     migrations: [],
@@ -295,7 +295,7 @@ export class ContainedDatabase {
     this.lockDirPath = path.join(resolvedDir, 'db.lock');
     fs.mkdirSync(resolvedDir, { recursive: true });
     this.blobs = new FilesystemBlobStore(path.join(resolvedDir, 'blobs'));
-    this.state = createEmptyDatabaseState(0);
+    this.state = createEmptyDatabaseState(CURRENT_SCHEMA_VERSION);
     this.loadFromDisk();
   }
 
@@ -355,7 +355,7 @@ export class ContainedDatabase {
 
   public loadFromDisk(): void {
     if (!fs.existsSync(this.dbFilePath)) {
-      this.state = createEmptyDatabaseState(0);
+      this.state = createEmptyDatabaseState(CURRENT_SCHEMA_VERSION);
       this.rebuildIndexes();
       return;
     }
@@ -365,7 +365,8 @@ export class ContainedDatabase {
         return;
       }
       const raw = fs.readFileSync(this.dbFilePath, 'utf8');
-      this.state = JSON.parse(raw) as DatabaseState;
+      const parsed = JSON.parse(raw) as DatabaseState;
+      this.state = { ...createEmptyDatabaseState(CURRENT_SCHEMA_VERSION), ...parsed, schema_version: CURRENT_SCHEMA_VERSION };
       this.lastLoadedMtimeMs = stat.mtimeMs;
       this.rebuildIndexes();
     } catch {
